@@ -1,0 +1,2865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to the Pet Show!</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Fredoka & Nunito for child-friendly readability -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+  <!-- MediaPipe Hands & Camera Utils CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --pastel-blue: #E0F2FE;
+      --pastel-yellow: #FEF9C3;
+      --pastel-green: #DCFCE7;
+      --pastel-orange: #FFEDD5;
+      --brand-blue: #0284C7;
+      --brand-yellow: #F59E0B;
+      --brand-green: #16A34A;
+      --brand-orange: #EA580C;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      background: linear-gradient(135deg, #E0F2FE 0%, #FEF9C3 50%, #DCFCE7 100%);
+      min-height: 100vh;
+      color: #1E293B;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, .font-display {
+      font-family: 'Fredoka', sans-serif;
+    }
+
+    /* Toy-like 3D bouncy buttons */
+    .toy-btn {
+      transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+    }
+    .toy-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 0 rgba(0, 0, 0, 0.15);
+    }
+    .toy-btn:active {
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+    }
+
+    /* Gentle floating animation */
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+    .animate-float {
+      animation: floatSlow 3.5s ease-in-out infinite;
+    }
+
+    @keyframes bouncePop {
+      0% { transform: scale(0.85); opacity: 0; }
+      70% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop {
+      animation: bouncePop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-10px, 6px); }
+      40% { transform: translate(10px, -6px); }
+      60% { transform: translate(-8px, -4px); }
+      80% { transform: translate(8px, 4px); }
+    }
+    .shake-effect {
+      animation: screenShake 0.4s ease-in-out;
+    }
+
+    @keyframes radarSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .radar-spin {
+      animation: radarSpin 2s linear infinite;
+    }
+
+    @keyframes starGlowPop {
+      0% { transform: scale(0) rotate(-30deg); opacity: 0; filter: drop-shadow(0 0 0px #FACC15); }
+      60% { transform: scale(1.3) rotate(10deg); opacity: 1; filter: drop-shadow(0 0 18px #FACC15); }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; filter: drop-shadow(0 0 10px #FACC15); }
+    }
+    .star-animated {
+      animation: starGlowPop 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #E0F2FE;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #7DD3FC;
+      border-radius: 999px;
+    }
+
+    /* Game Fullscreen Overlay */
+    #game-fullscreen-wrapper {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      z-index: 50;
+      background: linear-gradient(135deg, #bae6fd 0%, #fef08a 50%, #bbf7d0 100%);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #game-fullscreen-wrapper.active {
+      display: flex;
+    }
+    #ar-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-yellow-300">
+
+  <!-- TOP NAVIGATION BAR (Editable Section Header) -->
+  <header id="main-navbar" class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b-4 border-sky-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2">
+      <!-- Brand Logo -->
+      <button onclick="navigateTo('home')" class="flex items-center gap-3 text-left group focus:outline-none">
+        <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-400 flex items-center justify-center text-2xl sm:text-3xl shadow-md border-2 border-amber-500 group-hover:scale-105 transition-transform">
+          🐾
+        </div>
+        <div>
+          <span class="font-display text-2xl sm:text-4xl font-extrabold text-sky-700 tracking-wide block leading-none uppercase">
+            PET SHOW
+          </span>
+          <span class="font-display text-sm sm:text-lg font-extrabold text-amber-600 uppercase tracking-wider block mt-0.5">
+            YEAR 1
+          </span>
+        </div>
+      </button>
+
+      <!-- Learning Journey Navigation Pills -->
+      <nav aria-label="Learning Journey" class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <button data-nav="home" onclick="navigateTo('home')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-sky-100 text-sky-800 border-2 border-sky-300">
+          🏠 Welcome
+        </button>
+        <button data-nav="pets" onclick="navigateTo('pets')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-amber-100 text-amber-900 border-2 border-amber-300">
+          🐶 Meet Pets
+        </button>
+        <button data-nav="learn" onclick="navigateTo('learn')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-emerald-100 text-emerald-900 border-2 border-emerald-300">
+          📦 Learn
+        </button>
+        <button data-nav="explore" onclick="navigateTo('explore')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-orange-100 text-orange-900 border-2 border-orange-300">
+          🔍 Let's Explore
+        </button>
+        <button data-nav="play" onclick="navigateTo('play')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-purple-100 text-purple-900 border-2 border-purple-300">
+          ⚡ Let's Play!
+        </button>
+        <button data-nav="check" onclick="navigateTo('check')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-rose-100 text-rose-900 border-2 border-rose-300">
+          ⭐ Let's Check!
+        </button>
+        <button data-nav="teacher" onclick="navigateTo('teacher')" class="nav-pill toy-btn px-3 py-2 rounded-2xl font-display font-bold text-sm sm:text-base bg-indigo-100 text-indigo-900 border-2 border-indigo-300">
+          👩‍🏫 Teacher's Corner
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main id="portal-content" class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+
+    <!-- =========================================================
+         PAGE 1: HOME – WELCOME TO THE PET SHOW!
+    ========================================================== -->
+    <section id="page-home" class="page-section animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-sky-200 text-center relative overflow-hidden">
+        <!-- Decorative Floating Clouds & Paw Prints -->
+        <div class="absolute top-4 left-6 text-4xl opacity-40 animate-float pointer-events-none">☁️</div>
+        <div class="absolute top-8 right-8 text-4xl opacity-40 animate-float pointer-events-none" style="animation-delay: 1s;">🎈</div>
+        <div class="absolute bottom-6 left-10 text-3xl opacity-30 pointer-events-none">🐾</div>
+        <div class="absolute bottom-6 right-10 text-3xl opacity-30 pointer-events-none">🐾</div>
+
+        <div class="inline-block bg-amber-200 text-amber-900 font-display font-bold px-5 py-1.5 rounded-full text-sm sm:text-base mb-4 border-2 border-amber-300">
+          🎪 Virtual Pet Show Adventure
+        </div>
+
+        <h1 class="font-display text-4xl sm:text-6xl font-bold text-sky-600 mb-4 drop-shadow-sm">
+          Welcome to the Pet Show!
+        </h1>
+
+        <p class="text-xl sm:text-2xl font-bold text-slate-700 max-w-2xl mx-auto mb-6 leading-relaxed">
+          Hello, little animal lovers! Are you ready to meet some lovely pets?
+        </p>
+
+        <!-- Hero Illustration: Custom SVG Group of Cute Pets -->
+        <div class="max-w-3xl mx-auto my-6 bg-gradient-to-b from-sky-100 via-yellow-50 to-emerald-100 rounded-3xl p-4 sm:p-6 border-4 border-amber-200 shadow-inner">
+          <svg viewBox="0 0 800 320" class="w-full h-auto max-h-72 mx-auto" role="img" aria-label="Cute cat, dog, rabbit, bird, fish and hamster together at the pet show">
+            <!-- Bunting Flags -->
+            <path d="M 30 30 Q 400 85 770 30" fill="none" stroke="#F59E0B" stroke-width="5" stroke-linecap="round"/>
+            <polygon points="90,42 120,46 105,78" fill="#F87171"/>
+            <polygon points="180,52 210,55 195,88" fill="#38BDF8"/>
+            <polygon points="270,58 300,60 285,92" fill="#4ADE80"/>
+            <polygon points="360,62 390,62 375,95" fill="#FBBF24"/>
+            <polygon points="450,60 480,58 465,92" fill="#A78BFA"/>
+            <polygon points="540,55 570,52 555,88" fill="#FB923C"/>
+            <polygon points="630,46 660,42 645,78" fill="#F472B6"/>
+
+            <!-- Grass Stage -->
+            <ellipse cx="400" cy="285" rx="360" ry="30" fill="#86EFAC"/>
+            <ellipse cx="400" cy="280" rx="330" ry="22" fill="#4ADE80"/>
+
+            <!-- Rabbit (Left) -->
+            <g transform="translate(115, 130)">
+              <ellipse cx="32" cy="30" rx="11" ry="38" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="3"/>
+              <ellipse cx="32" cy="30" rx="5" ry="26" fill="#FBCFE8"/>
+              <ellipse cx="68" cy="30" rx="11" ry="38" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="3"/>
+              <ellipse cx="68" cy="30" rx="5" ry="26" fill="#FBCFE8"/>
+              <circle cx="50" cy="95" r="42" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="3"/>
+              <circle cx="36" cy="88" r="5" fill="#1E293B"/>
+              <circle cx="64" cy="88" r="5" fill="#1E293B"/>
+              <ellipse cx="50" cy="100" rx="6" ry="4" fill="#F472B6"/>
+              <path d="M 43 108 Q 50 115 57 108" fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+            </g>
+
+            <!-- Dog (Center-Left) -->
+            <g transform="translate(245, 120)">
+              <ellipse cx="22" cy="85" rx="16" ry="32" transform="rotate(15 22 85)" fill="#92400E"/>
+              <ellipse cx="108" cy="85" rx="16" ry="32" transform="rotate(-15 108 85)" fill="#92400E"/>
+              <circle cx="65" cy="95" r="50" fill="#D97706"/>
+              <ellipse cx="65" cy="110" rx="28" ry="22" fill="#FEF3C7"/>
+              <circle cx="46" cy="84" r="6" fill="#1E293B"/>
+              <circle cx="84" cy="84" r="6" fill="#1E293B"/>
+              <ellipse cx="65" cy="102" rx="9" ry="6" fill="#1E293B"/>
+              <path d="M 55 114 Q 65 125 75 114" fill="none" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round"/>
+              <path d="M 60 119 Q 65 132 70 119" fill="#F43F5E"/>
+            </g>
+
+            <!-- Cat (Center-Right) -->
+            <g transform="translate(410, 125)">
+              <polygon points="22,60 32,15 62,48" fill="#FB923C"/>
+              <polygon points="108,60 98,15 68,48" fill="#FB923C"/>
+              <polygon points="28,54 34,26 54,48" fill="#FED7AA"/>
+              <polygon points="102,54 96,26 76,48" fill="#FED7AA"/>
+              <circle cx="65" cy="90" r="48" fill="#FB923C"/>
+              <circle cx="47" cy="82" r="6" fill="#1E293B"/>
+              <circle cx="83" cy="82" r="6" fill="#1E293B"/>
+              <polygon points="59,95 71,95 65,102" fill="#F472B6"/>
+              <path d="M 53 107 Q 65 116 77 107" fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+              <line x1="12" y1="88" x2="35" y2="92" stroke="#7C2D12" stroke-width="2.5"/>
+              <line x1="12" y1="98" x2="35" y2="98" stroke="#7C2D12" stroke-width="2.5"/>
+              <line x1="95" y1="92" x2="118" y2="88" stroke="#7C2D12" stroke-width="2.5"/>
+              <line x1="95" y1="98" x2="118" y2="98" stroke="#7C2D12" stroke-width="2.5"/>
+            </g>
+
+            <!-- Hamster (Right) -->
+            <g transform="translate(565, 165)">
+              <circle cx="25" cy="35" r="14" fill="#FCD34D"/>
+              <circle cx="75" cy="35" r="14" fill="#FCD34D"/>
+              <circle cx="50" cy="65" r="38" fill="#FDE68A"/>
+              <circle cx="28" cy="72" r="12" fill="#FCA5A5" opacity="0.6"/>
+              <circle cx="72" cy="72" r="12" fill="#FCA5A5" opacity="0.6"/>
+              <circle cx="38" cy="58" r="5" fill="#1E293B"/>
+              <circle cx="62" cy="58" r="5" fill="#1E293B"/>
+              <circle cx="50" cy="68" r="4" fill="#F472B6"/>
+            </g>
+
+            <!-- Bird (Flying Top Left) -->
+            <g transform="translate(180, 65)">
+              <ellipse cx="40" cy="35" rx="26" ry="20" fill="#38BDF8"/>
+              <polygon points="64,32 78,37 64,42" fill="#F59E0B"/>
+              <circle cx="48" cy="30" r="4" fill="#1E293B"/>
+              <path d="M 22 30 Q 38 15 45 35" fill="#0284C7"/>
+            </g>
+
+            <!-- Fish in Bowl (Bottom Right) -->
+            <g transform="translate(655, 195)">
+              <circle cx="45" cy="45" r="38" fill="#BAE6FD" fill-opacity="0.7" stroke="#38BDF8" stroke-width="3"/>
+              <ellipse cx="45" cy="48" rx="18" ry="11" fill="#F97316"/>
+              <polygon points="27,48 16,38 16,58" fill="#EA580C"/>
+              <circle cx="53" cy="45" r="3" fill="#1E293B"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Simple Learning Overview Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto my-8 text-left">
+          <div class="bg-sky-50 border-3 border-sky-200 rounded-3xl p-4 flex items-center gap-3">
+            <span class="text-4xl">🐶</span>
+            <div>
+              <h3 class="font-display font-bold text-lg text-sky-800">1. Meet 6 Pets</h3>
+              <p class="text-sm font-semibold text-slate-600">Learn pet names and hear how they sound.</p>
+            </div>
+          </div>
+          <div class="bg-emerald-50 border-3 border-emerald-200 rounded-3xl p-4 flex items-center gap-3">
+            <span class="text-4xl">📦</span>
+            <div>
+              <h3 class="font-display font-bold text-lg text-emerald-800">2. In, On, Under</h3>
+              <p class="text-sm font-semibold text-slate-600">Find out where the cute pets are hiding!</p>
+            </div>
+          </div>
+          <div class="bg-amber-50 border-3 border-amber-200 rounded-3xl p-4 flex items-center gap-3">
+            <span class="text-4xl">⚡</span>
+            <div>
+              <h3 class="font-display font-bold text-lg text-amber-800">3. Play & Check</h3>
+              <p class="text-sm font-semibold text-slate-600">Play fun games and win shiny stars!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prominent Let's Start Button -->
+        <button onclick="navigateTo('pets')" class="toy-btn bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white font-display font-bold text-2xl sm:text-3xl px-10 py-5 rounded-full border-4 border-white shadow-xl inline-flex items-center gap-3">
+          <span>Let's Start!</span>
+          <span class="text-3xl">🚀</span>
+        </button>
+
+        <!-- Responsible Use of Artificial Intelligence & Credits, Privacy & Responsible Use -->
+        <div class="max-w-4xl mx-auto mt-10 text-left space-y-6">
+          <!-- Card 1: Responsible Use of Artificial Intelligence -->
+          <div class="bg-sky-50/90 rounded-3xl p-6 sm:p-8 border-4 border-sky-200 shadow-sm">
+            <h2 class="font-display text-2xl sm:text-3xl font-bold text-sky-700 mb-3">
+              Responsible Use of Artificial Intelligence
+            </h2>
+            <div class="space-y-3 text-base sm:text-lg font-semibold text-slate-700 leading-relaxed">
+              <p>
+                Artificial intelligence (AI) tools were utilised during the creation of the Pet Show website to assist with producing visual illustrations, developing educational materials and designing interactive learning activities.
+              </p>
+              <p>
+                All AI-generated and AI-assisted resources were checked, refined and adjusted to ensure their suitability for Year 1 pupils and their relevance to the English language learning objectives.
+              </p>
+              <p>
+                AI served as a supplementary resource throughout the development process. The final selection of learning content, activities and educational approaches was determined by the website creator.
+              </p>
+            </div>
+          </div>
+
+          <!-- Card 2: Credits, Privacy & Responsible Use -->
+          <div class="bg-amber-50/90 rounded-3xl p-6 sm:p-8 border-4 border-amber-200 shadow-sm">
+            <h2 class="font-display text-2xl sm:text-3xl font-bold text-amber-700 mb-4">
+              Credits, Privacy &amp; Responsible Use
+            </h2>
+            <div class="space-y-4 text-base sm:text-lg font-semibold text-slate-700 leading-relaxed">
+              <div>
+                <h3 class="font-display text-xl font-bold text-amber-800 mb-1">Educational Purpose</h3>
+                <p>
+                  Welcome to the Pet Show! is an interactive digital learning environment designed to introduce Year 1 pupils to common pet vocabulary and the use of prepositions of place in English.
+                </p>
+              </div>
+
+              <div>
+                <h3 class="font-display text-xl font-bold text-amber-800 mb-1">Copyright and Credits</h3>
+                <p>
+                  Educational videos embedded from YouTube belong to their respective content creators and are used through the platform's embedding feature. Illustrations and interactive learning materials created with AI assistance were prepared for educational purposes. Any third-party resources used are acknowledged through their original sources.
+                </p>
+              </div>
+
+              <div>
+                <h3 class="font-display text-xl font-bold text-amber-800 mb-1">Privacy and Data Protection</h3>
+                <p class="mb-2">
+                  The interactive activities are designed to function without requiring pupils to enter personal details or sensitive information. Responses and quiz results are processed within the webpage and are not intentionally shared with external assessment databases.
+                </p>
+                <p>
+                  However, third-party services such as Google Sites and YouTube may collect or process certain user information in accordance with their own privacy policies and data protection practices.
+                </p>
+              </div>
+
+              <div>
+                <h3 class="font-display text-xl font-bold text-amber-800 mb-1">Responsible Digital Use</h3>
+                <p>
+                  Pupils are encouraged to interact with the website appropriately, respect the work and contributions of others, and protect their personal information when using digital platforms. They should also seek assistance from their teachers or parents whenever necessary.
+                </p>
+              </div>
+
+              <div>
+                <h3 class="font-display text-xl font-bold text-amber-800 mb-1">Educational Disclaimer</h3>
+                <p>
+                  The Pet Show website is intended solely as an educational resource to support young learners in developing their English vocabulary, listening skills and understanding of basic prepositions. Its content is designed to complement classroom learning and does not replace guidance from teachers.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 2: MEET THE PETS
+    ========================================================== -->
+    <section id="page-pets" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-amber-200">
+        <div class="text-center mb-8">
+          <span class="inline-block bg-amber-100 text-amber-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-amber-300">
+            🐾 Vocabulary Time
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-bold text-amber-600 mb-2">
+            Meet the Pets!
+          </h2>
+          <p class="text-lg sm:text-xl font-bold text-slate-600">
+            Tap the speaker button 🔊 to listen to each pet!
+          </p>
+        <!-- Educational Pet Video Card with Thumbnail Preview -->
+        <div class="max-w-3xl mx-auto mb-8 bg-sky-50 rounded-3xl p-4 sm:p-6 border-4 border-sky-200 shadow-inner text-center">
+          <div class="inline-flex items-center gap-2 bg-sky-500 text-white font-display font-bold px-4 py-1.5 rounded-full text-sm sm:text-base mb-3 shadow">
+            <span>🎬 Watch & Sing Along!</span>
+          </div>
+          <a href="https://youtu.be/tj4JdexVNBA" target="_blank" rel="noopener noreferrer" class="group block relative w-full overflow-hidden rounded-2xl border-4 border-white shadow-lg bg-slate-900" style="aspect-ratio: 16 / 9;">
+            <img
+              src="https://img.youtube.com/vi/tj4JdexVNBA/hqdefault.jpg"
+              onerror="this.onerror=null;this.src='https://placehold.co/800x450/38BDF8/FFFFFF?text=Meet+the+Pets+Video';"
+              alt="Meet the Pets YouTube Video Thumbnail"
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+            <div class="absolute inset-0 bg-slate-900/25 group-hover:bg-slate-900/10 transition-colors flex flex-col items-center justify-center">
+              <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-rose-500 group-hover:bg-rose-600 text-white flex items-center justify-center shadow-2xl border-4 border-white group-hover:scale-110 transition-transform">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 sm:w-10 sm:h-10 ml-1">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+              <span class="mt-2 bg-white/95 text-slate-800 font-display font-bold text-sm sm:text-base px-4 py-1 rounded-full shadow">
+                Tap to Watch Video!
+              </span>
+            </div>
+          </a>
+        </div>
+
+        <!-- 6 Pet Cards Grid -->
+        <div id="pets-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <!-- Populated dynamically via JS for clean editing & consistent audio -->
+        </div>
+
+        <!-- Next Section Button -->
+        <div class="mt-10 text-center">
+          <button onclick="navigateTo('learn')" class="toy-btn bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold text-xl sm:text-2xl px-8 py-4 rounded-full border-4 border-emerald-200 inline-flex items-center gap-3">
+            <span>Next: Learn In, On & Under</span>
+            <span>➡️</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 3: LEARN – PREPOSITIONS OF PLACE
+    ========================================================== -->
+    <section id="page-learn" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-emerald-200">
+        <div class="text-center mb-8">
+          <span class="inline-block bg-emerald-100 text-emerald-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-emerald-300">
+            📦 Where Is the Pet?
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-bold text-emerald-600 mb-2">
+            Learn: IN, ON, UNDER
+          </h2>
+          <p class="text-lg sm:text-xl font-bold text-slate-600">
+            Look at the pictures and tap the buttons to hear and see!
+          </p>
+        </div>
+
+        <!-- Interactive Preposition Playground Demo -->
+        <div class="bg-sky-50 rounded-3xl p-6 border-4 border-sky-200 mb-8 max-w-3xl mx-auto text-center">
+          <h3 class="font-display text-2xl font-bold text-sky-800 mb-2">
+            ✨ Magic Position Changer!
+          </h3>
+          <p class="text-base font-bold text-slate-600 mb-4">
+            Tap a word below to move the cute cat!
+          </p>
+
+          <!-- Animated Visual Stage -->
+          <div class="relative w-full max-w-md h-60 mx-auto bg-white rounded-3xl border-4 border-sky-200 overflow-hidden shadow-inner flex items-center justify-center">
+            <!-- Table / Box Illustration -->
+            <svg viewBox="0 0 320 220" class="w-full h-full">
+              <!-- Floor -->
+              <rect x="0" y="185" width="320" height="35" fill="#DCFCE7"/>
+              <!-- Wooden Table -->
+              <rect x="70" y="105" width="180" height="16" rx="6" fill="#D97706"/>
+              <rect x="85" y="121" width="14" height="68" fill="#B45309"/>
+              <rect x="221" y="121" width="14" height="68" fill="#B45309"/>
+
+              <!-- Open Box on right side -->
+              <g id="demo-box" style="display:none;">
+                <rect x="105" y="115" width="110" height="72" rx="8" fill="#FBBF24" stroke="#D97706" stroke-width="3"/>
+                <polygon points="105,115 88,98 198,98 215,115" fill="#FDE68A" stroke="#D97706" stroke-width="2"/>
+              </g>
+
+              <!-- Animated Cat Group -->
+              <g id="demo-cat-group" style="transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); transform: translate(130px, 38px);">
+                <polygon points="10,25 16,5 30,20" fill="#FB923C"/>
+                <polygon points="50,25 44,5 30,20" fill="#FB923C"/>
+                <circle cx="30" cy="36" r="22" fill="#FB923C"/>
+                <circle cx="22" cy="33" r="3" fill="#1E293B"/>
+                <circle cx="38" cy="33" r="3" fill="#1E293B"/>
+                <polygon points="27,39 33,39 30,43" fill="#F472B6"/>
+                <path d="M 24 46 Q 30 50 36 46" fill="none" stroke="#1E293B" stroke-width="2" stroke-linecap="round"/>
+              </g>
+
+              <!-- Front wall of Box when IN -->
+              <g id="demo-box-front" style="display:none;">
+                <rect x="105" y="132" width="110" height="55" rx="6" fill="#F59E0B" stroke="#B45309" stroke-width="3"/>
+                <text x="160" y="165" text-anchor="middle" fill="#FFFBEB" font-family="Fredoka" font-weight="bold" font-size="18">BOX</text>
+              </g>
+            </svg>
+          </div>
+
+          <p id="demo-sentence" class="font-display text-2xl sm:text-3xl font-bold text-sky-700 mt-4">
+            The cat is <span class="underline decoration-amber-400 decoration-4">ON</span> the table.
+          </p>
+
+          <div class="flex flex-wrap justify-center gap-3 mt-4">
+            <button onclick="setDemoPrep('IN')" class="toy-btn bg-amber-400 text-white font-display font-bold text-xl px-6 py-3 rounded-2xl border-2 border-amber-500">
+              📦 IN
+            </button>
+            <button onclick="setDemoPrep('ON')" class="toy-btn bg-sky-500 text-white font-display font-bold text-xl px-6 py-3 rounded-2xl border-2 border-sky-600">
+              ⬆️ ON
+            </button>
+            <button onclick="setDemoPrep('UNDER')" class="toy-btn bg-emerald-500 text-white font-display font-bold text-xl px-6 py-3 rounded-2xl border-2 border-emerald-600">
+              ⬇️ UNDER
+            </button>
+          </div>
+        </div>
+
+        <!-- Three Core Preposition Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- CARD 1: IN -->
+          <div class="bg-amber-50 rounded-3xl p-6 border-4 border-amber-200 flex flex-col items-center text-center shadow-md">
+            <span class="bg-amber-400 text-white font-display font-bold text-2xl px-6 py-1.5 rounded-full mb-4 shadow">
+              IN
+            </span>
+            <div class="w-44 h-44 bg-white rounded-3xl border-3 border-amber-200 flex items-center justify-center mb-4 p-2">
+              <!-- Cat IN the box SVG -->
+              <svg viewBox="0 0 180 180" class="w-full h-full">
+                <polygon points="35,90 22,72 138,72 150,90" fill="#FDE68A" stroke="#D97706" stroke-width="3"/>
+                <!-- Cat peeking out -->
+                <polygon points="62,65 68,42 84,60" fill="#FB923C"/>
+                <polygon points="118,65 112,42 96,60" fill="#FB923C"/>
+                <circle cx="90" cy="76" r="26" fill="#FB923C"/>
+                <circle cx="80" cy="72" r="3.5" fill="#1E293B"/>
+                <circle cx="100" cy="72" r="3.5" fill="#1E293B"/>
+                <polygon points="86,79 94,79 90,84" fill="#F472B6"/>
+                <!-- Front Box -->
+                <rect x="35" y="90" width="115" height="65" rx="8" fill="#F59E0B" stroke="#B45309" stroke-width="3"/>
+                <text x="92" y="130" text-anchor="middle" fill="#FFFFFF" font-family="Fredoka" font-weight="bold" font-size="20">BOX</text>
+              </svg>
+            </div>
+            <p class="font-display text-2xl font-bold text-slate-800 mb-2">
+              The cat is <span class="text-amber-600">IN</span> the box.
+            </p>
+            <p class="text-base font-bold text-slate-600 mb-4">
+              Inside something.
+            </p>
+            <button onclick="speakText('The cat is in the box.')" class="toy-btn mt-auto bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-lg px-5 py-2.5 rounded-2xl flex items-center gap-2">
+              <span>🔊 Listen</span>
+            </button>
+          </div>
+
+          <!-- CARD 2: ON -->
+          <div class="bg-sky-50 rounded-3xl p-6 border-4 border-sky-200 flex flex-col items-center text-center shadow-md">
+            <span class="bg-sky-500 text-white font-display font-bold text-2xl px-6 py-1.5 rounded-full mb-4 shadow">
+              ON
+            </span>
+            <div class="w-44 h-44 bg-white rounded-3xl border-3 border-sky-200 flex items-center justify-center mb-4 p-2">
+              <!-- Bird ON the tree SVG -->
+              <svg viewBox="0 0 180 180" class="w-full h-full">
+                <!-- Tree Trunk & Leaves -->
+                <rect x="78" y="100" width="24" height="65" fill="#92400E"/>
+                <circle cx="90" cy="95" r="45" fill="#4ADE80"/>
+                <circle cx="65" cy="105" r="30" fill="#22C55E"/>
+                <circle cx="115" cy="105" r="30" fill="#22C55E"/>
+                <!-- Bird sitting ON top of tree -->
+                <ellipse cx="90" cy="42" rx="20" ry="15" fill="#38BDF8"/>
+                <polygon points="108,39 120,43 108,47" fill="#F59E0B"/>
+                <circle cx="96" cy="38" r="3" fill="#1E293B"/>
+                <path d="M 78 40 Q 88 30 94 43" fill="#0284C7"/>
+              </svg>
+            </div>
+            <p class="font-display text-2xl font-bold text-slate-800 mb-2">
+              The bird is <span class="text-sky-600">ON</span> the tree.
+            </p>
+            <p class="text-base font-bold text-slate-600 mb-4">
+              On top of something.
+            </p>
+            <button onclick="speakText('The bird is on the tree.')" class="toy-btn mt-auto bg-sky-500 hover:bg-sky-600 text-white font-display font-bold text-lg px-5 py-2.5 rounded-2xl flex items-center gap-2">
+              <span>🔊 Listen</span>
+            </button>
+          </div>
+
+          <!-- CARD 3: UNDER -->
+          <div class="bg-emerald-50 rounded-3xl p-6 border-4 border-emerald-200 flex flex-col items-center text-center shadow-md">
+            <span class="bg-emerald-500 text-white font-display font-bold text-2xl px-6 py-1.5 rounded-full mb-4 shadow">
+              UNDER
+            </span>
+            <div class="w-44 h-44 bg-white rounded-3xl border-3 border-emerald-200 flex items-center justify-center mb-4 p-2">
+              <!-- Dog UNDER the table SVG -->
+              <svg viewBox="0 0 180 180" class="w-full h-full">
+                <!-- Table -->
+                <rect x="20" y="55" width="140" height="14" rx="5" fill="#D97706"/>
+                <rect x="32" y="69" width="12" height="90" fill="#B45309"/>
+                <rect x="136" y="69" width="12" height="90" fill="#B45309"/>
+                <!-- Dog UNDER table -->
+                <ellipse cx="66" cy="118" rx="9" ry="18" fill="#78350F"/>
+                <ellipse cx="114" cy="118" rx="9" ry="18" fill="#78350F"/>
+                <circle cx="90" cy="122" r="26" fill="#D97706"/>
+                <ellipse cx="90" cy="130" rx="14" ry="11" fill="#FEF3C7"/>
+                <circle cx="81" cy="116" r="3.5" fill="#1E293B"/>
+                <circle cx="99" cy="116" r="3.5" fill="#1E293B"/>
+                <ellipse cx="90" cy="126" rx="5" ry="3.5" fill="#1E293B"/>
+              </svg>
+            </div>
+            <p class="font-display text-2xl font-bold text-slate-800 mb-2">
+              The dog is <span class="text-emerald-600">UNDER</span> the table.
+            </p>
+            <p class="text-base font-bold text-slate-600 mb-4">
+              Below something.
+            </p>
+            <button onclick="speakText('The dog is under the table.')" class="toy-btn mt-auto bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold text-lg px-5 py-2.5 rounded-2xl flex items-center gap-2">
+              <span>🔊 Listen</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-10 text-center">
+          <button onclick="navigateTo('explore')" class="toy-btn bg-orange-500 hover:bg-orange-600 text-white font-display font-bold text-xl sm:text-2xl px-8 py-4 rounded-full border-4 border-orange-200 inline-flex items-center gap-3">
+            <span>Next: Let's Explore!</span>
+            <span>➡️</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 4: LET'S EXPLORE! – INTERACTIVE ACTIVITIES
+    ========================================================== -->
+    <section id="page-explore" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-orange-200">
+        <div class="text-center mb-6">
+          <span class="inline-block bg-orange-100 text-orange-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-orange-300">
+            🔍 Practice Time
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-bold text-orange-600 mb-2">
+            Let's Explore!
+          </h2>
+          <p class="text-lg sm:text-xl font-bold text-slate-600">
+            Try all three fun activities! Tap an answer to check!
+          </p>
+        </div>
+
+        <!-- Activity Switcher Tabs -->
+        <div class="flex flex-wrap justify-center gap-3 mb-8">
+          <button id="tab-act-a" onclick="switchExploreTab('A')" class="toy-btn px-5 py-3 rounded-2xl font-display font-bold text-lg bg-orange-500 text-white border-2 border-orange-600">
+            🐶 Activity A: Guess the Pet
+          </button>
+          <button id="tab-act-b" onclick="switchExploreTab('B')" class="toy-btn px-5 py-3 rounded-2xl font-display font-bold text-lg bg-sky-100 text-sky-900 border-2 border-sky-300">
+            📍 Activity B: Where Is the Pet?
+          </button>
+          <button id="tab-act-c" onclick="switchExploreTab('C')" class="toy-btn px-5 py-3 rounded-2xl font-display font-bold text-lg bg-emerald-100 text-emerald-900 border-2 border-emerald-300">
+            ✏️ Activity C: Complete the Sentence
+          </button>
+        </div>
+
+        <!-- Activity Stage Container -->
+        <div id="explore-stage" class="max-w-2xl mx-auto bg-amber-50/80 rounded-3xl p-6 sm:p-8 border-4 border-amber-200 text-center shadow-inner">
+          <!-- Rendered dynamically by JS -->
+        </div>
+
+        <div class="mt-10 text-center">
+          <button onclick="navigateTo('play')" class="toy-btn bg-purple-600 hover:bg-purple-700 text-white font-display font-bold text-xl sm:text-2xl px-8 py-4 rounded-full border-4 border-purple-200 inline-flex items-center gap-3">
+            <span>Next: Let's Play Thunder Lock!</span>
+            <span>⚡</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 5: LET'S PLAY! – LIGHTNING TEACHER – THUNDER LOCK LAUNCHER
+    ========================================================== -->
+    <section id="page-play" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-purple-200 text-center">
+        <div class="inline-block bg-purple-100 text-purple-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-purple-300">
+          ⚡ AR Hand Gesture & Touch Game
+        </div>
+        <h2 class="font-display text-3xl sm:text-5xl font-bold text-purple-700 mb-3">
+          Lightning Teacher – Thunder Lock
+        </h2>
+        <p class="text-lg sm:text-xl font-bold text-slate-600 max-w-2xl mx-auto mb-6">
+          Use your magic hand in front of the camera—or tap the screen—to lock onto the right pet answer and fire a Thunder Beam!
+        </p>
+
+        <!-- How to Play Visual Guide -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto mb-8">
+          <div class="bg-sky-50 border-3 border-sky-200 rounded-3xl p-5">
+            <div class="text-5xl mb-2">✋</div>
+            <h3 class="font-display font-bold text-xl text-sky-800">1. Open Palm</h3>
+            <p class="text-sm font-bold text-slate-600">Show your open hand to power up your Cyber Gauntlet!</p>
+          </div>
+          <div class="bg-amber-50 border-3 border-amber-200 rounded-3xl p-5">
+            <div class="text-5xl mb-2">✊</div>
+            <h3 class="font-display font-bold text-xl text-amber-800">2. Clench Fist</h3>
+            <p class="text-sm font-bold text-slate-600">Close your fist on the right answer ball to charge 100%!</p>
+          </div>
+          <div class="bg-emerald-50 border-3 border-emerald-200 rounded-3xl p-5">
+            <div class="text-5xl mb-2">⚡</div>
+            <h3 class="font-display font-bold text-xl text-emerald-800">3. Thunder Fire!</h3>
+            <p class="text-sm font-bold text-slate-600">Blast the right answer and build a ×5 super combo!</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap justify-center gap-4">
+          <button onclick="launchThunderLockGame()" class="toy-btn bg-gradient-to-r from-sky-500 via-purple-500 to-amber-500 text-white font-display font-bold text-2xl sm:text-3xl px-10 py-5 rounded-full border-4 border-white shadow-xl inline-flex items-center gap-3">
+            <span>🎮 Start AR Game!</span>
+          </button>
+          <button onclick="navigateTo('check')" class="toy-btn bg-rose-500 hover:bg-rose-600 text-white font-display font-bold text-xl px-7 py-5 rounded-full border-4 border-rose-200 inline-flex items-center gap-2">
+            <span>Go to Let's Check! ⭐</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 6: LET'S CHECK! – DIGITAL ASSESSMENT
+    ========================================================== -->
+    <section id="page-check" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-rose-200">
+        <div class="text-center mb-6">
+          <span class="inline-block bg-rose-100 text-rose-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-rose-300">
+            ⭐ Star Quiz Challenge
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-bold text-rose-600 mb-2">
+            Let's Check!
+          </h2>
+          <p class="text-lg sm:text-xl font-bold text-slate-600">
+            Answer all 10 questions to earn your Pet Show Champion Certificate!
+          </p>
+        </div>
+
+        <!-- Quiz Container -->
+        <div id="quiz-container" class="max-w-2xl mx-auto bg-sky-50/90 rounded-3xl p-6 sm:p-8 border-4 border-sky-200 shadow-inner">
+          <!-- Dynamically rendered quiz -->
+        </div>
+      </div>
+    </section>
+
+    <!-- =========================================================
+         PAGE 7: TEACHER'S CORNER – LESSON PLAN
+    ========================================================== -->
+    <section id="page-teacher" class="page-section hidden animate-pop">
+      <div class="bg-white/95 rounded-[2.5rem] p-6 sm:p-10 shadow-xl border-4 border-indigo-200">
+        <div class="text-center mb-8">
+          <span class="inline-block bg-indigo-100 text-indigo-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2 border-2 border-indigo-300">
+            👩‍🏫 Lesson Guide
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-bold text-indigo-700 mb-2">
+            Teacher's Corner
+          </h2>
+          <p class="text-lg sm:text-xl font-bold text-slate-600">
+            Year 1 English Lesson Plan – Pet Show (60 Minutes)
+          </p>
+        </div>
+
+        <div class="max-w-5xl mx-auto space-y-6 text-slate-800">
+          <!-- A. Lesson Information -->
+          <div class="bg-indigo-50/80 rounded-3xl p-6 border-4 border-indigo-200">
+            <h3 class="font-display text-2xl font-bold text-indigo-800 mb-4">
+              A. Lesson Information
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm">
+                <tbody class="divide-y-2 divide-indigo-100 text-base sm:text-lg">
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900 w-1/3">Subject</th>
+                    <td class="py-3 px-4 font-semibold">English</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Year</th>
+                    <td class="py-3 px-4 font-semibold">Year 1</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Duration</th>
+                    <td class="py-3 px-4 font-semibold">60 minutes</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Theme</th>
+                    <td class="py-3 px-4 font-semibold">World of Knowledge</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Topic</th>
+                    <td class="py-3 px-4 font-semibold">Pet Show</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Main Skill</th>
+                    <td class="py-3 px-4 font-semibold">Speaking</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Complementary Skill</th>
+                    <td class="py-3 px-4 font-semibold">Listening</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Language Focus</th>
+                    <td class="py-3 px-4 font-semibold">Pet vocabulary and prepositions of place</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Grammar / Vocabulary</th>
+                    <td class="py-3 px-4 font-semibold">IN, ON, UNDER; cat, dog, rabbit, bird, fish, hamster</td>
+                  </tr>
+                  <tr>
+                    <th class="py-3 px-4 bg-indigo-100/70 font-display font-bold text-indigo-900">Teaching Materials</th>
+                    <td class="py-3 px-4 font-semibold">Interactive Google Site website, laptop, LCD projector, speakers and webcam</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- B. Content and Learning Standards -->
+          <div class="bg-sky-50/80 rounded-3xl p-6 border-4 border-sky-200">
+            <h3 class="font-display text-2xl font-bold text-sky-800 mb-4">
+              B. Content and Learning Standards
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="bg-white rounded-2xl p-5 border-2 border-sky-200 shadow-sm">
+                <h4 class="font-display text-xl font-bold text-sky-700 mb-2">Main Skill: Speaking</h4>
+                <ul class="list-disc pl-5 space-y-2 font-semibold text-base text-slate-700">
+                  <li><strong>Content Standard 2.1:</strong> Communicate simple information intelligibly.</li>
+                  <li><strong>Learning Standard 2.1.5:</strong> Describe people and objects using suitable words and phrases. (learning standards)</li>
+                </ul>
+              </div>
+              <div class="bg-white rounded-2xl p-5 border-2 border-sky-200 shadow-sm">
+                <h4 class="font-display text-xl font-bold text-sky-700 mb-2">Complementary Skill: Listening</h4>
+                <ul class="list-disc pl-5 space-y-2 font-semibold text-base text-slate-700">
+                  <li><strong>Content Standard 1.2:</strong> Understand meaning in a variety of familiar contexts.</li>
+                  <li><strong>Learning Standard 1.2.5:</strong> Understand a wide range of short supported questions. (learning standards)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- C. Learning Objectives & D. Success Criteria -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-emerald-50/80 rounded-3xl p-6 border-4 border-emerald-200">
+              <h3 class="font-display text-2xl font-bold text-emerald-800 mb-3">
+                C. Learning Objectives
+              </h3>
+              <p class="font-bold text-slate-700 mb-2">By the end of the lesson, pupils should be able to:</p>
+              <ol class="list-decimal pl-5 space-y-2 font-semibold text-base text-slate-700">
+                <li>Name at least four pets using appropriate English vocabulary with intelligible pronunciation.</li>
+                <li>Describe the positions of pets using the prepositions IN, ON and UNDER by correctly answering at least 4 out of 5 questions.</li>
+              </ol>
+            </div>
+
+            <div class="bg-amber-50/80 rounded-3xl p-6 border-4 border-amber-200">
+              <h3 class="font-display text-2xl font-bold text-amber-800 mb-3">
+                D. Success Criteria
+              </h3>
+              <p class="font-bold text-slate-700 mb-2">Pupils can:</p>
+              <ol class="list-decimal pl-5 space-y-2 font-semibold text-base text-slate-700">
+                <li>Sing the pet vocabulary chant and correctly pronounce at least four pet names.</li>
+                <li>Select the correct preposition (IN, ON or UNDER) when answering questions about the positions of pets.</li>
+                <li>Participate in the Pet Grab and Throw game by placing pets in the correct positions.</li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- E. Teaching and Learning Activities -->
+          <div class="bg-orange-50/80 rounded-3xl p-6 border-4 border-orange-200 space-y-5">
+            <h3 class="font-display text-2xl font-bold text-orange-800">
+              E. Teaching and Learning Activities
+            </h3>
+
+            <!-- Stage 1 -->
+            <div class="bg-white rounded-2xl p-5 border-2 border-orange-200 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-display text-xl font-bold text-orange-700">1. Set Induction – Welcome to the Pet Show!</h4>
+                <span class="bg-orange-100 text-orange-800 font-display font-bold px-3 py-1 rounded-full text-sm">⏱ 5 minutes</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 font-semibold text-base text-slate-700 mb-3">
+                <li>Teacher displays the Google Sites homepage on the LCD projector.</li>
+                <li>Teacher welcomes the pupils and introduces the topic by saying, "Hello, little animal lovers! Are you ready for our Pet Show?"</li>
+                <li>Pupils look at the different pet pictures displayed on the screen.</li>
+                <li>Teacher asks, "What animals can you see?" and encourages pupils to name the pets they already know.</li>
+                <li>Pupils respond by naming the animals using simple English words.</li>
+                <li>Teacher encourages pupils to pronounce the names clearly and asks follow-up questions such as, "Do you have a pet?" and "What is your favourite animal?"</li>
+              </ol>
+              <div class="inline-block bg-sky-100 text-sky-900 font-display font-bold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-sky-300">
+                WEBSITE SECTION: HOME – WELCOME TO THE PET SHOW!
+              </div>
+            </div>
+
+            <!-- Stage 2 -->
+            <div class="bg-white rounded-2xl p-5 border-2 border-orange-200 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-display text-xl font-bold text-orange-700">2. Presentation – Meet the Pets and Learn</h4>
+                <span class="bg-orange-100 text-orange-800 font-display font-bold px-3 py-1 rounded-full text-sm">⏱ 15 minutes</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 font-semibold text-base text-slate-700 mb-3">
+                <li>Teacher navigates to the Meet the Pets section and plays the YouTube video, Pets Vocabulary Chant for Children.</li>
+                <li>Pupils watch and listen to the chant.</li>
+                <li>Teacher encourages pupils to sing along and pronounce the names of the pets.</li>
+                <li>Teacher introduces the six pets (cat, dog, rabbit, bird, fish and hamster) using the pictures and audio pronunciation buttons.</li>
+                <li>Pupils repeat the names of the pets after listening to the audio.</li>
+                <li>Teacher asks pupils to identify the pets individually and encourages them to say the names without relying on the audio.</li>
+                <li>Teacher moves to the Learn section and introduces the prepositions IN, ON and UNDER using visual illustrations.</li>
+                <li>Teacher displays the sentences:
+                  <ul class="list-disc pl-6 mt-1 space-y-1">
+                    <li>The cat is IN the box.</li>
+                    <li>The bird is ON the tree.</li>
+                    <li>The dog is UNDER the table.</li>
+                  </ul>
+                </li>
+                <li>Pupils listen and repeat the sentences after the teacher.</li>
+                <li>Teacher asks questions such as, "Where is the cat?" and "Where is the bird?"</li>
+                <li>Pupils answer orally using the correct prepositions and complete sentences.</li>
+              </ol>
+              <div class="inline-block bg-amber-100 text-amber-900 font-display font-bold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-amber-300">
+                WEBSITE SECTIONS: MEET THE PETS + LEARN
+              </div>
+            </div>
+
+            <!-- Stage 3 -->
+            <div class="bg-white rounded-2xl p-5 border-2 border-orange-200 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-display text-xl font-bold text-orange-700">3. Practice – Let's Explore!</h4>
+                <span class="bg-orange-100 text-orange-800 font-display font-bold px-3 py-1 rounded-full text-sm">⏱ 15 minutes</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 font-semibold text-base text-slate-700 mb-3">
+                <li>Teacher navigates to the Let's Explore section and introduces the interactive activities.</li>
+                <li>Pupils participate in the Guess the Pet activity by answering picture-based questions.</li>
+                <li>Teacher encourages pupils to answer using complete sentences, such as "It is a rabbit."</li>
+                <li>Teacher proceeds to the Where Is the Pet? activity and displays pictures of pets in different positions.</li>
+                <li>Pupils identify the positions of the pets and answer orally using IN, ON or UNDER.</li>
+                <li>Pupils complete the sentences by choosing the correct missing prepositions.</li>
+                <li>Teacher invites selected pupils to explain their answers using simple sentences.</li>
+                <li>Teacher discusses the answers and provides guidance when necessary.</li>
+              </ol>
+              <div class="inline-block bg-orange-100 text-orange-900 font-display font-bold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-orange-300">
+                WEBSITE SECTION: LET'S EXPLORE!
+              </div>
+            </div>
+
+            <!-- Stage 4 -->
+            <div class="bg-white rounded-2xl p-5 border-2 border-orange-200 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-display text-xl font-bold text-orange-700">4. Production – Pet Grab and Throw</h4>
+                <span class="bg-orange-100 text-orange-800 font-display font-bold px-3 py-1 rounded-full text-sm">⏱ 15 minutes</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 font-semibold text-base text-slate-700 mb-3">
+                <li>Teacher opens the Pet Grab and Throw game and demonstrates how to use hand gestures in front of the laptop camera.</li>
+                <li>Teacher explains that pupils need to grab a pet using their hand and throw it towards the correct position shown on the screen.</li>
+                <li>Teacher demonstrates an example by saying, "I will grab the cat and throw it IN the box."</li>
+                <li>Pupils take turns participating in the game while their classmates observe and help identify the correct positions.</li>
+                <li>Pupils complete challenges such as:
+                  <ul class="list-disc pl-6 mt-1 space-y-1">
+                    <li>Grab the cat and throw it IN the box.</li>
+                    <li>Grab the bird and throw it ON the tree.</li>
+                    <li>Grab the dog and throw it UNDER the table.</li>
+                  </ul>
+                </li>
+                <li>Before or after each attempt, pupils are encouraged to describe their actions using complete sentences.</li>
+                <li>The game provides immediate feedback and awards points for correct answers.</li>
+                <li>Teacher reinforces the correct use of the prepositions and encourages pupils to speak clearly throughout the activity.</li>
+              </ol>
+              <div class="inline-block bg-purple-100 text-purple-900 font-display font-bold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-purple-300">
+                WEBSITE SECTION: LET'S PLAY! – PET GRAB AND THROW
+              </div>
+            </div>
+
+            <!-- Stage 5 -->
+            <div class="bg-white rounded-2xl p-5 border-2 border-orange-200 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h4 class="font-display text-xl font-bold text-orange-700">5. Closure – Let's Check!</h4>
+                <span class="bg-orange-100 text-orange-800 font-display font-bold px-3 py-1 rounded-full text-sm">⏱ 10 minutes</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 font-semibold text-base text-slate-700 mb-3">
+                <li>Teacher asks pupils to recall the six pets and the three prepositions learnt during the lesson.</li>
+                <li>Pupils respond by naming the pets and saying IN, ON and UNDER.</li>
+                <li>Teacher asks selected pupils to describe the positions of pets using simple sentences.</li>
+                <li>Teacher navigates to the Let's Check section and displays the digital assessment.</li>
+                <li>Pupils answer the multiple-choice questions individually or together as a class, depending on the available devices.</li>
+                <li>Teacher discusses selected questions and encourages pupils to explain their answers orally.</li>
+                <li>The website automatically marks the answers and displays the final score.</li>
+                <li>Teacher congratulates pupils on their participation and briefly summarises what they have learnt.</li>
+              </ol>
+              <div class="inline-block bg-rose-100 text-rose-900 font-display font-bold text-xs sm:text-sm px-3 py-1.5 rounded-xl border border-rose-300">
+                WEBSITE SECTION: LET'S CHECK!
+              </div>
+            </div>
+          </div>
+
+          <!-- F. Assessment -->
+          <div class="bg-rose-50/80 rounded-3xl p-6 border-4 border-rose-200">
+            <h3 class="font-display text-2xl font-bold text-rose-800 mb-4">
+              F. Assessment
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse bg-white rounded-2xl overflow-hidden shadow-sm">
+                <thead>
+                  <tr class="bg-rose-100/80 font-display font-bold text-rose-900 text-base sm:text-lg">
+                    <th class="py-3 px-4 w-1/3">Assessment method</th>
+                    <th class="py-3 px-4">Evidence of learning</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y-2 divide-rose-100 text-base sm:text-lg font-semibold text-slate-700">
+                  <tr>
+                    <td class="py-3 px-4 font-bold text-slate-800">Observation</td>
+                    <td class="py-3 px-4">Pupils participate in the pet vocabulary chant and pronounce pet names.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-3 px-4 font-bold text-slate-800">Oral questioning</td>
+                    <td class="py-3 px-4">Pupils answer questions about pet positions.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-3 px-4 font-bold text-slate-800">Interactive activities</td>
+                    <td class="py-3 px-4">Pupils select appropriate prepositions in Let's Explore.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-3 px-4 font-bold text-slate-800">Pet Grab and Throw</td>
+                    <td class="py-3 px-4">Pupils demonstrate their understanding of IN, ON and UNDER through the game.</td>
+                  </tr>
+                  <tr>
+                    <td class="py-3 px-4 font-bold text-slate-800">Digital assessment</td>
+                    <td class="py-3 px-4">Pupils answer the multiple-choice questions and achieve at least 4/5 correct responses in the targeted position questions.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- =========================================================
+       FULLSCREEN AR GAME OVERLAY: LIGHTNING TEACHER – THUNDER LOCK
+  ========================================================== -->
+  <div id="game-fullscreen-wrapper" role="dialog" aria-label="Lightning Teacher Thunder Lock Game">
+    <!-- Hidden Webcam Video Feed -->
+    <video id="webcam-video" playsinline muted style="display:none;"></video>
+
+    <!-- Interactive AR Canvas -->
+    <canvas id="ar-canvas"></canvas>
+
+    <!-- TOP PETS HUD -->
+    <div class="relative z-20 flex flex-wrap items-center justify-between gap-2 px-3 sm:px-6 pt-3 pointer-events-none">
+      <!-- Score & Combo Pill -->
+      <div class="flex items-center gap-2 sm:gap-3 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border-3 border-sky-300 shadow-lg pointer-events-auto">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xl">🏆</span>
+          <span class="font-display font-bold text-lg sm:text-xl text-sky-700" id="hud-score">0</span>
+        </div>
+        <div class="h-5 w-0.5 bg-sky-200"></div>
+        <div class="bg-amber-400 text-white font-display font-bold text-sm sm:text-base px-3 py-0.5 rounded-full shadow-sm" id="hud-combo">
+          ×1
+        </div>
+      </div>
+
+      <!-- Mission Progress Nodes -->
+      <div class="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border-3 border-emerald-300 shadow-lg flex flex-col items-center">
+        <span class="font-display font-bold text-xs sm:text-sm text-emerald-700 tracking-wider" id="hud-mission-label">
+          MISSION 01 / 06
+        </span>
+        <div id="hud-mission-nodes" class="flex items-center gap-1.5 mt-1 text-sm sm:text-base text-emerald-500">
+          ● ○ ○ ○ ○ ○
+        </div>
+      </div>
+
+      <!-- Controls (Mode Indicator & Exit) -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="hud-camera-btn" onclick="retryCameraAccess()" class="toy-btn bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-xs sm:text-sm px-3 py-2 rounded-full border-2 border-white shadow-md">
+          📷 Enable Camera
+        </button>
+        <span id="hud-mode-badge" class="hidden sm:inline-block bg-purple-100 text-purple-800 font-display font-bold text-xs px-3 py-2 rounded-full border-2 border-purple-300">
+          ✋ HAND / TOUCH READY
+        </span>
+        <button onclick="exitThunderLockGame()" class="toy-btn bg-rose-500 hover:bg-rose-600 text-white font-display font-bold text-sm sm:text-base px-4 py-2 rounded-full border-2 border-white shadow-md">
+          ✖ Exit
+        </button>
+      </div>
+    </div>
+
+    <!-- QUESTION CARD BANNER (Spaced cleanly from answer targets) -->
+    <div id="game-question-banner" class="relative z-20 mx-auto mt-3 px-4 w-full max-w-2xl pointer-events-none">
+      <div class="bg-white/95 backdrop-blur-md rounded-3xl p-3 sm:p-4 border-4 border-amber-300 shadow-xl flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 sm:gap-4">
+          <div id="game-q-illustration" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-sky-50 border-2 border-sky-200 flex items-center justify-center shrink-0 overflow-hidden">
+            <!-- SVG Illustration injected here -->
+          </div>
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-600 block">Pet Show Challenge</span>
+            <h3 id="game-q-text" class="font-display font-bold text-lg sm:text-2xl text-slate-800 leading-snug">
+              Loading question...
+            </h3>
+          </div>
+        </div>
+        <button onclick="speakCurrentGameQuestion()" class="toy-btn pointer-events-auto bg-sky-400 hover:bg-sky-500 text-white w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 border-2 border-white">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <!-- CENTER FEEDBACK BANNER (TARGET LOCK / CORRECT! / WRONG TARGET) -->
+    <div id="game-status-toast" class="relative z-20 mx-auto mt-2 pointer-events-none opacity-0 transition-opacity duration-200">
+      <span id="game-status-text" class="inline-block font-display font-bold text-xl sm:text-3xl px-6 py-2 rounded-full bg-sky-600 text-white border-4 border-white shadow-xl">
+        TARGET LOCK
+      </span>
+    </div>
+
+    <!-- BOTTOM FLOATING CAT MASCOT HELPER -->
+    <div class="relative z-20 mt-auto mb-3 mx-auto px-4 w-full max-w-xl pointer-events-none">
+      <div class="bg-white/95 backdrop-blur-md rounded-full px-4 py-2.5 border-4 border-orange-300 shadow-xl flex items-center gap-3">
+        <div class="w-11 h-11 rounded-full bg-orange-100 border-2 border-orange-400 flex items-center justify-center text-2xl shrink-0 animate-bounce">
+          🐱
+        </div>
+        <div class="text-left">
+          <span class="text-[11px] font-display font-bold uppercase text-orange-500 block leading-none">Floating Cat</span>
+          <p id="floating-cat-message" class="font-bold text-sm sm:text-base text-slate-800 leading-tight">
+            Open your palm to select an answer.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOADING MODAL (Connecting to Grab & Throw Game...) -->
+    <div id="game-loading-modal" class="fixed inset-0 z-30 bg-sky-900/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-[2.5rem] p-8 max-w-md w-full text-center border-4 border-sky-300 shadow-2xl relative overflow-hidden">
+        <!-- Scanning line effect -->
+        <div class="w-28 h-28 mx-auto mb-5 relative flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full border-4 border-dashed border-sky-400 radar-spin"></div>
+          <div class="w-20 h-20 rounded-full bg-sky-100 flex items-center justify-center text-4xl">
+            📡
+          </div>
+        </div>
+        <h3 class="font-display font-bold text-2xl text-sky-700 mb-2">
+          CONNECTING TO GRAB & THROW GAME...
+        </h3>
+        <p class="font-bold text-slate-600 mb-4" id="loading-status-sub">
+          Activating hand detection system...
+        </p>
+        <div class="w-full bg-sky-100 h-5 rounded-full overflow-hidden border-2 border-sky-300 mb-2">
+          <div id="loading-progress-bar" class="bg-gradient-to-r from-sky-400 to-emerald-400 h-full transition-all duration-200" style="width: 15%"></div>
+        </div>
+        <span id="loading-percent-text" class="font-display font-bold text-lg text-sky-600">15%</span>
+      </div>
+    </div>
+
+    <!-- CAMERA ERROR MODAL -->
+    <div id="game-camera-error-modal" class="fixed inset-0 z-30 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+      <div class="bg-white rounded-[2.5rem] p-8 max-w-md w-full text-center border-4 border-rose-300 shadow-2xl">
+        <div class="text-6xl mb-3">📷🚫</div>
+        <h3 class="font-display font-bold text-2xl sm:text-3xl text-rose-600 mb-2">
+          CAMERA ACCESS DENIED
+        </h3>
+        <p class="font-bold text-slate-600 mb-6">
+          This game requires camera access to detect hand movements. You can retry camera access or play with Touch / Mouse mode!
+        </p>
+        <div class="flex flex-wrap justify-center gap-3">
+          <button onclick="retryCameraAccess()" class="toy-btn bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-lg px-6 py-3 rounded-full border-2 border-amber-600">
+            🔄 RETRY
+          </button>
+          <button onclick="startTouchFallbackMode()" class="toy-btn bg-sky-500 hover:bg-sky-600 text-white font-display font-bold text-lg px-6 py-3 rounded-full border-2 border-sky-600">
+            👆 PLAY WITH TOUCH
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VICTORY MODAL (MISSION COMPLETE) -->
+    <div id="game-victory-modal" class="fixed inset-0 z-30 bg-purple-900/80 backdrop-blur-md flex items-center justify-center p-4 hidden overflow-y-auto">
+      <div class="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-lg w-full text-center border-4 border-amber-300 shadow-2xl my-auto">
+        <div class="inline-block bg-amber-100 text-amber-800 font-display font-bold px-4 py-1 rounded-full text-sm mb-2">
+          🎉 Pet Show Hero!
+        </div>
+        <h3 class="font-display font-bold text-3xl sm:text-4xl text-purple-700 mb-3">
+          MISSION COMPLETE
+        </h3>
+
+        <!-- Holographic Animated Stars -->
+        <div id="victory-stars-container" class="flex justify-center items-center gap-4 my-4 min-h-[64px]">
+          <!-- Stars injected with staggered animations -->
+        </div>
+
+        <!-- Game Statistics Grid -->
+        <div class="grid grid-cols-2 gap-3 my-5 text-left">
+          <div class="bg-sky-50 p-3.5 rounded-2xl border-2 border-sky-200">
+            <span class="text-xs font-bold text-sky-600 uppercase block">Final Score</span>
+            <span id="stat-final-score" class="font-display font-bold text-2xl text-slate-800">0</span>
+          </div>
+          <div class="bg-amber-50 p-3.5 rounded-2xl border-2 border-amber-200">
+            <span class="text-xs font-bold text-amber-600 uppercase block">Highest Combo</span>
+            <span id="stat-highest-combo" class="font-display font-bold text-2xl text-slate-800">×1</span>
+          </div>
+          <div class="bg-rose-50 p-3.5 rounded-2xl border-2 border-rose-200">
+            <span class="text-xs font-bold text-rose-600 uppercase block">Missed Shots</span>
+            <span id="stat-missed-shots" class="font-display font-bold text-2xl text-slate-800">0</span>
+          </div>
+          <div class="bg-emerald-50 p-3.5 rounded-2xl border-2 border-emerald-200">
+            <span class="text-xs font-bold text-emerald-600 uppercase block">Questions Mastered</span>
+            <span id="stat-mastered" class="font-display font-bold text-2xl text-slate-800">6 / 6</span>
+          </div>
+        </div>
+
+        <!-- Review Panel (Toggled by REVIEW button) -->
+        <div id="victory-review-box" class="hidden bg-slate-50 rounded-2xl p-4 mb-5 border-2 border-slate-200 text-left max-h-44 overflow-y-auto">
+          <h4 class="font-display font-bold text-base text-purple-700 mb-2">📚 Pet Show Review:</h4>
+          <ul id="victory-review-list" class="space-y-1.5 text-sm font-bold text-slate-700"></ul>
+        </div>
+
+        <!-- Post-Game Buttons -->
+        <div class="flex flex-wrap justify-center gap-3">
+          <button onclick="restartThunderLockGame()" class="toy-btn bg-emerald-500 hover:bg-emerald-600 text-white font-display font-bold text-base sm:text-lg px-5 py-3 rounded-full border-2 border-emerald-200">
+            🔄 PLAY AGAIN
+          </button>
+          <button onclick="toggleVictoryReview()" class="toy-btn bg-amber-400 hover:bg-amber-500 text-white font-display font-bold text-base sm:text-lg px-5 py-3 rounded-full border-2 border-amber-200">
+            📚 REVIEW
+          </button>
+          <button onclick="exitThunderLockGame()" class="toy-btn bg-sky-500 hover:bg-sky-600 text-white font-display font-bold text-base sm:text-lg px-5 py-3 rounded-full border-2 border-sky-200">
+            🏠 MAIN MENU
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       APPLICATION LOGIC & PROCEDURAL AUDIO ENGINE
+  ========================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. SHARED SVG ILLUSTRATIONS & CURRICULUM DATA (EASY TO EDIT)
+     *************************************************************************/
+    const PET_SVGS = {
+      cat: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#FFEDD5"/>
+        <polygon points="38,68 48,22 76,55" fill="#FB923C"/>
+        <polygon points="122,68 112,22 84,55" fill="#FB923C"/>
+        <polygon points="44,62 50,34 68,55" fill="#FED7AA"/>
+        <polygon points="116,62 110,34 92,55" fill="#FED7AA"/>
+        <circle cx="80" cy="92" r="46" fill="#FB923C"/>
+        <circle cx="63" cy="84" r="6" fill="#1E293B"/>
+        <circle cx="97" cy="84" r="6" fill="#1E293B"/>
+        <polygon points="74,97 86,97 80,104" fill="#F472B6"/>
+        <path d="M 68 109 Q 80 118 92 109" fill="none" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round"/>
+        <line x1="25" y1="90" x2="48" y2="94" stroke="#7C2D12" stroke-width="2.5"/>
+        <line x1="25" y1="100" x2="48" y2="100" stroke="#7C2D12" stroke-width="2.5"/>
+        <line x1="112" y1="94" x2="135" y2="90" stroke="#7C2D12" stroke-width="2.5"/>
+        <line x1="112" y1="100" x2="135" y2="100" stroke="#7C2D12" stroke-width="2.5"/>
+      </svg>`,
+      dog: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#FEF3C7"/>
+        <ellipse cx="36" cy="85" rx="16" ry="32" transform="rotate(15 36 85)" fill="#92400E"/>
+        <ellipse cx="124" cy="85" rx="16" ry="32" transform="rotate(-15 124 85)" fill="#92400E"/>
+        <circle cx="80" cy="90" r="48" fill="#D97706"/>
+        <ellipse cx="80" cy="105" rx="26" ry="20" fill="#FEF3C7"/>
+        <circle cx="62" cy="80" r="6" fill="#1E293B"/>
+        <circle cx="98" cy="80" r="6" fill="#1E293B"/>
+        <ellipse cx="80" cy="97" rx="9" ry="6" fill="#1E293B"/>
+        <path d="M 69 108 Q 80 119 91 108" fill="none" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round"/>
+        <path d="M 75 113 Q 80 126 85 113" fill="#F43F5E"/>
+      </svg>`,
+      rabbit: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#FCE7F3"/>
+        <ellipse cx="62" cy="42" rx="11" ry="34" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+        <ellipse cx="62" cy="42" rx="5" ry="22" fill="#FBCFE8"/>
+        <ellipse cx="98" cy="42" rx="11" ry="34" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+        <ellipse cx="98" cy="42" rx="5" ry="22" fill="#FBCFE8"/>
+        <circle cx="80" cy="102" r="40" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="3"/>
+        <circle cx="66" cy="95" r="5" fill="#1E293B"/>
+        <circle cx="94" cy="95" r="5" fill="#1E293B"/>
+        <ellipse cx="80" cy="106" rx="6" ry="4" fill="#F472B6"/>
+        <path d="M 72 114 Q 80 121 88 114" fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+      </svg>`,
+      bird: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#E0F2FE"/>
+        <ellipse cx="80" cy="88" rx="42" ry="34" fill="#38BDF8"/>
+        <polygon points="118,82 142,89 118,96" fill="#F59E0B"/>
+        <circle cx="94" cy="78" r="6" fill="#1E293B"/>
+        <circle cx="96" cy="76" r="2" fill="#FFFFFF"/>
+        <path d="M 52 84 Q 76 62 88 92" fill="#0284C7"/>
+        <polygon points="38,85 20,72 24,96" fill="#0284C7"/>
+      </svg>`,
+      fish: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#CFFAFE"/>
+        <circle cx="80" cy="84" r="54" fill="#BAE6FD" stroke="#0284C7" stroke-width="4"/>
+        <ellipse cx="84" cy="88" rx="28" ry="18" fill="#F97316"/>
+        <polygon points="56,88 38,72 38,104" fill="#EA580C"/>
+        <circle cx="98" cy="83" r="4.5" fill="#1E293B"/>
+        <circle cx="114" cy="60" r="4" fill="#FFFFFF" opacity="0.8"/>
+        <circle cx="106" cy="48" r="3" fill="#FFFFFF" opacity="0.8"/>
+      </svg>`,
+      hamster: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <circle cx="80" cy="80" r="72" fill="#FEF9C3"/>
+        <circle cx="52" cy="54" r="15" fill="#F59E0B"/>
+        <circle cx="108" cy="54" r="15" fill="#F59E0B"/>
+        <circle cx="80" cy="92" r="44" fill="#FDE68A"/>
+        <circle cx="54" cy="100" r="13" fill="#FCA5A5" opacity="0.65"/>
+        <circle cx="106" cy="100" r="13" fill="#FCA5A5" opacity="0.65"/>
+        <circle cx="66" cy="84" r="5.5" fill="#1E293B"/>
+        <circle cx="94" cy="84" r="5.5" fill="#1E293B"/>
+        <circle cx="80" cy="95" r="4.5" fill="#F472B6"/>
+        <path d="M 73 103 Q 80 109 87 103" fill="none" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+      </svg>`,
+      cat_in_box: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <rect width="160" height="160" rx="24" fill="#FEF3C7"/>
+        <polygon points="54,60 60,36 76,55" fill="#FB923C"/>
+        <polygon points="106,60 100,36 84,55" fill="#FB923C"/>
+        <circle cx="80" cy="72" r="24" fill="#FB923C"/>
+        <circle cx="71" cy="68" r="3.5" fill="#1E293B"/>
+        <circle cx="89" cy="68" r="3.5" fill="#1E293B"/>
+        <polygon points="76,75 84,75 80,80" fill="#F472B6"/>
+        <rect x="30" y="84" width="100" height="58" rx="8" fill="#D97706" stroke="#92400E" stroke-width="3"/>
+        <text x="80" y="120" text-anchor="middle" fill="#FFF" font-family="Fredoka" font-weight="bold" font-size="18">IN BOX</text>
+      </svg>`,
+      bird_on_tree: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <rect width="160" height="160" rx="24" fill="#E0F2FE"/>
+        <rect x="70" y="95" width="20" height="55" fill="#92400E"/>
+        <circle cx="80" cy="92" r="40" fill="#4ADE80"/>
+        <ellipse cx="80" cy="44" rx="18" ry="13" fill="#0284C7"/>
+        <polygon points="96,41 108,45 96,49" fill="#F59E0B"/>
+        <circle cx="86" cy="40" r="3" fill="#1E293B"/>
+      </svg>`,
+      dog_under_table: `<svg viewBox="0 0 160 160" class="w-full h-full">
+        <rect width="160" height="160" rx="24" fill="#DCFCE7"/>
+        <rect x="20" y="45" width="120" height="14" rx="5" fill="#B45309"/>
+        <rect x="30" y="59" width="12" height="85" fill="#92400E"/>
+        <rect x="118" y="59" width="12" height="85" fill="#92400E"/>
+        <circle cx="80" cy="112" r="24" fill="#D97706"/>
+        <ellipse cx="58" cy="110" rx="8" ry="16" fill="#78350F"/>
+        <ellipse cx="102" cy="110" rx="8" ry="16" fill="#78350F"/>
+        <circle cx="72" cy="107" r="3.5" fill="#1E293B"/>
+        <circle cx="88" cy="107" r="3.5" fill="#1E293B"/>
+        <ellipse cx="80" cy="116" rx="5" ry="3.5" fill="#1E293B"/>
+      </svg>`
+    };
+
+    const PETS_DATA = [
+      {
+        id: 'cat',
+        name: 'CAT',
+        sentence: 'This is a cat. It has four legs and a long tail.',
+        fact: 'Cats love to purr when they are happy!',
+        bg: 'bg-orange-50',
+        border: 'border-orange-200',
+        badge: 'bg-orange-500'
+      },
+      {
+        id: 'dog',
+        name: 'DOG',
+        sentence: 'This is a dog. It likes to bark and wag its tail.',
+        fact: 'Dogs are friendly and love to play fetch!',
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        badge: 'bg-amber-500'
+      },
+      {
+        id: 'rabbit',
+        name: 'RABBIT',
+        sentence: 'This is a rabbit. It has two long ears and hops fast.',
+        fact: 'Rabbits love eating crunchy carrots!',
+        bg: 'bg-pink-50',
+        border: 'border-pink-200',
+        badge: 'bg-pink-500'
+      },
+      {
+        id: 'bird',
+        name: 'BIRD',
+        sentence: 'This is a bird. It has two wings and can fly high.',
+        fact: 'Birds sing sweet songs in the morning!',
+        bg: 'bg-sky-50',
+        border: 'border-sky-200',
+        badge: 'bg-sky-500'
+      },
+      {
+        id: 'fish',
+        name: 'FISH',
+        sentence: 'This is a fish. It lives and swims in the water.',
+        fact: 'Fish use their fins and tail to swim!',
+        bg: 'bg-cyan-50',
+        border: 'border-cyan-200',
+        badge: 'bg-cyan-600'
+      },
+      {
+        id: 'hamster',
+        name: 'HAMSTER',
+        sentence: 'This is a hamster. It is small, furry and cute.',
+        fact: 'Hamsters keep seeds in their puffy cheeks!',
+        bg: 'bg-yellow-50',
+        border: 'border-yellow-200',
+        badge: 'bg-yellow-500'
+      }
+    ];
+
+    /*************************************************************************
+     * 2. SPEECH SYNTHESIS HELPER (SAFE PRONUNCIATION FOR YEAR 1 PUPILS)
+     *************************************************************************/
+    let selectedFemaleVoice = null;
+
+    function loadFemaleVoice() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+
+      // Prioritise warm, clear female English voices across Windows, macOS, iOS, Android & Chrome
+      const preferredFemaleKeywords = [
+        'hazel', 'libby', 'sonia', 'susan', 'serena', 'kate', 'stephanie',
+        'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona',
+        'zira', 'aria', 'jenny', 'emma', 'amy', 'joanna', 'salli',
+        'google uk english female', 'google us english', 'female', 'woman'
+      ];
+
+      const englishVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+      const pool = englishVoices.length ? englishVoices : voices;
+
+      for (const keyword of preferredFemaleKeywords) {
+        const match = pool.find(v => v.name.toLowerCase().includes(keyword));
+        if (match) {
+          selectedFemaleVoice = match;
+          return;
+        }
+      }
+
+      // Fallback to first available English voice if no explicit female label is exposed
+      selectedFemaleVoice = pool[0] || null;
+    }
+
+    if ('speechSynthesis' in window) {
+      loadFemaleVoice();
+      window.speechSynthesis.onvoiceschanged = loadFemaleVoice;
+    }
+
+    function speakText(text) {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          if (!selectedFemaleVoice) loadFemaleVoice();
+          const utter = new SpeechSynthesisUtterance(text);
+          if (selectedFemaleVoice) {
+            utter.voice = selectedFemaleVoice;
+            utter.lang = selectedFemaleVoice.lang;
+          } else {
+            utter.lang = 'en-GB';
+          }
+          utter.rate = 0.88; // Clear, slightly slower pace for 6-7 year olds
+          utter.pitch = 1.22; // Warm, friendly woman's vocal tone
+          window.speechSynthesis.speak(utter);
+        }
+      } catch (e) {
+        // Ignore if blocked by browser policy
+      }
+    }
+
+    /*************************************************************************
+     * 3. PAGE NAVIGATION & INITIALIZATION
+     *************************************************************************/
+    function navigateTo(pageId) {
+      document.querySelectorAll('.page-section').forEach(sec => sec.classList.add('hidden'));
+      const target = document.getElementById(`page-${pageId}`);
+      if (target) {
+        target.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (pageId === 'explore') {
+          speakCurrentExploreQuestion();
+        }
+      }
+    }
+
+    // Render Meet The Pets Cards
+    function renderPetsGrid() {
+      const grid = document.getElementById('pets-grid');
+      grid.innerHTML = PETS_DATA.map(pet => `
+        <div class="${pet.bg} rounded-3xl p-6 border-4 ${pet.border} flex flex-col items-center text-center shadow-md hover:shadow-xl transition-shadow">
+          <div class="w-40 h-40 mb-4 rounded-3xl bg-white p-2 border-2 ${pet.border} shadow-inner">
+            ${PET_SVGS[pet.id]}
+          </div>
+          <span class="${pet.badge} text-white font-display font-bold text-2xl sm:text-3xl px-6 py-1 rounded-full mb-3 shadow">
+            ${pet.name}
+          </span>
+          <p class="font-bold text-lg text-slate-800 mb-3 leading-snug">
+            "${pet.sentence}"
+          </p>
+          <div class="bg-white/80 rounded-2xl p-3 border-2 ${pet.border} text-sm font-bold text-slate-600 mb-4 w-full">
+            💡 Fun Fact: ${pet.fact}
+          </div>
+          <button onclick="speakText('${pet.name}. ${pet.sentence}')" class="toy-btn mt-auto bg-sky-500 hover:bg-sky-600 text-white font-display font-bold text-lg px-6 py-3 rounded-full border-2 border-white flex items-center gap-2">
+            <span>🔊 Hear "${pet.name}"</span>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    // Interactive Preposition Demo Stage
+    function setDemoPrep(prep) {
+      const cat = document.getElementById('demo-cat-group');
+      const boxBack = document.getElementById('demo-box');
+      const boxFront = document.getElementById('demo-box-front');
+      const sentenceEl = document.getElementById('demo-sentence');
+
+      if (prep === 'IN') {
+        boxBack.style.display = 'block';
+        boxFront.style.display = 'block';
+        cat.style.transform = 'translate(130px, 95px)';
+        sentenceEl.innerHTML = `The cat is <span class="text-amber-600 underline decoration-amber-400 decoration-4">IN</span> the box.`;
+        speakText('The cat is in the box.');
+      } else if (prep === 'ON') {
+        boxBack.style.display = 'none';
+        boxFront.style.display = 'none';
+        cat.style.transform = 'translate(130px, 38px)';
+        sentenceEl.innerHTML = `The cat is <span class="text-sky-600 underline decoration-sky-400 decoration-4">ON</span> the table.`;
+        speakText('The cat is on the table.');
+      } else if (prep === 'UNDER') {
+        boxBack.style.display = 'none';
+        boxFront.style.display = 'none';
+        cat.style.transform = 'translate(130px, 125px)';
+        sentenceEl.innerHTML = `The cat is <span class="text-emerald-600 underline decoration-emerald-400 decoration-4">UNDER</span> the table.`;
+        speakText('The cat is under the table.');
+      }
+    }
+
+    /*************************************************************************
+     * 4. PAGE 4: LET'S EXPLORE! INTERACTIVE ACTIVITIES (A, B, C)
+     *************************************************************************/
+    const EXPLORE_DATA = {
+      A: [
+        { img: 'cat', prompt: 'What pet is this?', options: ['Cat', 'Dog', 'Fish'], answer: 'Cat' },
+        { img: 'rabbit', prompt: 'What pet has two long ears?', options: ['Bird', 'Rabbit', 'Hamster'], answer: 'Rabbit' },
+        { img: 'fish', prompt: 'What pet swims in water?', options: ['Cat', 'Hamster', 'Fish'], answer: 'Fish' },
+        { img: 'hamster', prompt: 'What small furry pet is this?', options: ['Hamster', 'Dog', 'Bird'], answer: 'Hamster' }
+      ],
+      B: [
+        { img: 'cat_in_box', prompt: 'Where is the cat?', options: ['IN the box', 'ON the box', 'UNDER the box'], answer: 'IN the box' },
+        { img: 'bird_on_tree', prompt: 'Where is the bird?', options: ['IN the tree', 'ON the tree', 'UNDER the tree'], answer: 'ON the tree' },
+        { img: 'dog_under_table', prompt: 'Where is the dog?', options: ['IN the table', 'ON the table', 'UNDER the table'], answer: 'UNDER the table' }
+      ],
+      C: [
+        { img: 'cat_in_box', prompt: 'The cat is ___ the box.', options: ['IN', 'ON', 'UNDER'], answer: 'IN' },
+        { img: 'bird_on_tree', prompt: 'The bird is ___ the tree.', options: ['IN', 'ON', 'UNDER'], answer: 'ON' },
+        { img: 'dog_under_table', prompt: 'The dog is ___ the table.', options: ['IN', 'ON', 'UNDER'], answer: 'UNDER' }
+      ]
+    };
+
+    let currentExploreTab = 'A';
+    let exploreIndex = 0;
+
+    function speakCurrentExploreQuestion() {
+      const items = EXPLORE_DATA[currentExploreTab];
+      const item = items[exploreIndex];
+      if (item) {
+        speakText(item.prompt.replace('___', 'blank'));
+      }
+    }
+
+    function switchExploreTab(tab) {
+      currentExploreTab = tab;
+      exploreIndex = 0;
+      ['A', 'B', 'C'].forEach(t => {
+        const btn = document.getElementById(`tab-act-${t.toLowerCase()}`);
+        if (t === tab) {
+          btn.className = 'toy-btn px-5 py-3 rounded-2xl font-display font-bold text-lg bg-orange-500 text-white border-2 border-orange-600';
+        } else {
+          btn.className = 'toy-btn px-5 py-3 rounded-2xl font-display font-bold text-lg bg-sky-100 text-sky-900 border-2 border-sky-300';
+        }
+      });
+      renderExploreStage(true);
+    }
+
+    function renderExploreStage(autoNarrate = false) {
+      const stage = document.getElementById('explore-stage');
+      const items = EXPLORE_DATA[currentExploreTab];
+      const item = items[exploreIndex];
+
+      stage.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+          <span class="bg-white px-4 py-1 rounded-full font-display font-bold text-sm text-orange-700 border-2 border-orange-200">
+            Question ${exploreIndex + 1} of ${items.length}
+          </span>
+          <button onclick="speakCurrentExploreQuestion()" class="toy-btn bg-sky-400 text-white px-3 py-1 rounded-full font-bold text-sm">
+            🔊 Read
+          </button>
+        </div>
+
+        <div class="w-44 h-44 mx-auto bg-white rounded-3xl p-3 border-4 border-amber-200 mb-5 shadow">
+          ${PET_SVGS[item.img]}
+        </div>
+
+        <h3 class="font-display text-2xl sm:text-3xl font-bold text-slate-800 mb-6">
+          ${item.prompt}
+        </h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          ${item.options.map(opt => `
+            <button onclick="checkExploreAnswer('${opt}')" class="toy-btn bg-white hover:bg-sky-50 text-slate-800 font-display font-bold text-xl py-4 px-4 rounded-2xl border-3 border-sky-300">
+              ${opt}
+            </button>
+          `).join('')}
+        </div>
+
+        <div id="explore-feedback" class="min-h-[64px] flex flex-col items-center justify-center"></div>
+      `;
+
+      if (autoNarrate) {
+        speakCurrentExploreQuestion();
+      }
+    }
+
+    function checkExploreAnswer(selected) {
+      const items = EXPLORE_DATA[currentExploreTab];
+      const item = items[exploreIndex];
+      const fb = document.getElementById('explore-feedback');
+
+      if (selected === item.answer) {
+        speakText('Great job! ' + selected);
+        const isLast = exploreIndex === items.length - 1;
+        fb.innerHTML = `
+          <div class="animate-pop bg-emerald-100 border-3 border-emerald-400 text-emerald-900 px-6 py-3 rounded-2xl font-display font-bold text-xl flex flex-wrap items-center justify-center gap-3">
+            <span>🌟 Wonderful! "${item.answer}" is correct!</span>
+            ${!isLast
+              ? `<button onclick="nextExploreItem()" class="toy-btn bg-emerald-500 text-white px-4 py-1.5 rounded-xl text-base">Next ➡️</button>`
+              : `<button onclick="retryExploreActivity()" class="toy-btn bg-amber-500 text-white px-4 py-1.5 rounded-xl text-base">🔄 Play Again</button>`
+            }
+          </div>
+        `;
+      } else {
+        speakText('Try again!');
+        fb.innerHTML = `
+          <div class="animate-pop bg-rose-100 border-3 border-rose-400 text-rose-900 px-6 py-3 rounded-2xl font-display font-bold text-lg flex items-center gap-3">
+            <span>❌ Oops! Look closely and try again!</span>
+            <button onclick="document.getElementById('explore-feedback').innerHTML=''" class="toy-btn bg-rose-500 text-white px-3 py-1 rounded-xl text-sm">Retry</button>
+          </div>
+        `;
+      }
+    }
+
+    function nextExploreItem() {
+      exploreIndex++;
+      renderExploreStage(true);
+    }
+
+    function retryExploreActivity() {
+      exploreIndex = 0;
+      renderExploreStage(true);
+    }
+
+    /*************************************************************************
+     * 5. PAGE 6: LET'S CHECK! DIGITAL ASSESSMENT (10 QUESTIONS)
+     *************************************************************************/
+    const QUIZ_QUESTIONS = [
+      { img: 'cat', q: '1. What animal is this?', opts: ['Cat', 'Dog', 'Fish'], ans: 'Cat' },
+      { img: 'dog', q: '2. Which pet likes to bark and wag its tail?', opts: ['Rabbit', 'Dog', 'Bird'], ans: 'Dog' },
+      { img: 'rabbit', q: '3. I have two long ears. Who am I?', opts: ['Hamster', 'Cat', 'Rabbit'], ans: 'Rabbit' },
+      { img: 'bird', q: '4. Which pet has wings and can fly?', opts: ['Fish', 'Bird', 'Dog'], ans: 'Bird' },
+      { img: 'fish', q: '5. Which pet lives and swims in water?', opts: ['Fish', 'Rabbit', 'Hamster'], ans: 'Fish' },
+      { img: 'hamster', q: '6. This small furry pet is a ___.', opts: ['Bird', 'Hamster', 'Cat'], ans: 'Hamster' },
+      { img: 'cat_in_box', q: '7. The cat is ___ the box.', opts: ['IN', 'ON', 'UNDER'], ans: 'IN' },
+      { img: 'bird_on_tree', q: '8. The bird is ___ the tree.', opts: ['IN', 'ON', 'UNDER'], ans: 'ON' },
+      { img: 'dog_under_table', q: '9. The dog is ___ the table.', opts: ['IN', 'ON', 'UNDER'], ans: 'UNDER' },
+      { img: 'cat_in_box', q: '10. Where is the orange cat?', opts: ['IN the box', 'ON the tree', 'UNDER the table'], ans: 'IN the box' }
+    ];
+
+    let quizIdx = 0;
+    let quizScore = 0;
+    let quizAnswered = false;
+
+    function renderQuiz() {
+      const container = document.getElementById('quiz-container');
+      if (quizIdx >= QUIZ_QUESTIONS.length) {
+        const stars = quizScore >= 8 ? '⭐⭐⭐' : (quizScore >= 5 ? '⭐⭐' : '⭐');
+        speakText(`Amazing work! You scored ${quizScore} out of 10!`);
+        container.innerHTML = `
+          <div class="text-center animate-pop py-4">
+            <div class="text-6xl mb-3">${stars}</div>
+            <h3 class="font-display text-3xl sm:text-4xl font-bold text-rose-600 mb-2">
+              Well Done, Pet Show Star!
+            </h3>
+            <p class="font-display text-2xl font-bold text-slate-800 mb-6">
+              Your Score: <span class="text-emerald-600">${quizScore} / ${QUIZ_QUESTIONS.length}</span>
+            </p>
+            <button onclick="resetQuiz()" class="toy-btn bg-rose-500 hover:bg-rose-600 text-white font-display font-bold text-xl px-8 py-4 rounded-full border-4 border-white shadow-lg">
+              🔄 Try Again
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const current = QUIZ_QUESTIONS[quizIdx];
+      quizAnswered = false;
+
+      container.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+          <span class="bg-rose-500 text-white font-display font-bold px-4 py-1 rounded-full text-sm">
+            Question ${quizIdx + 1} / ${QUIZ_QUESTIONS.length}
+          </span>
+          <span class="font-display font-bold text-lg text-sky-700">
+            Score: ${quizScore}
+          </span>
+        </div>
+
+        <div class="w-40 h-40 mx-auto bg-white rounded-3xl p-2 border-4 border-sky-200 mb-4 shadow">
+          ${PET_SVGS[current.img]}
+        </div>
+
+        <h3 class="font-display text-2xl sm:text-3xl font-bold text-slate-800 text-center mb-6">
+          ${current.q}
+        </h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          ${current.opts.map(opt => `
+            <button onclick="submitQuizAnswer(this, '${opt}')" class="quiz-opt-btn toy-btn bg-white hover:bg-amber-50 text-slate-800 font-display font-bold text-xl py-4 px-4 rounded-2xl border-3 border-sky-300">
+              ${opt}
+            </button>
+          `).join('')}
+        </div>
+
+        <div id="quiz-feedback" class="min-h-[60px] text-center"></div>
+      `;
+    }
+
+    function submitQuizAnswer(btnEl, selected) {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const current = QUIZ_QUESTIONS[quizIdx];
+      const fb = document.getElementById('quiz-feedback');
+
+      if (selected === current.ans) {
+        quizScore++;
+        btnEl.classList.replace('bg-white', 'bg-emerald-400');
+        btnEl.classList.add('text-white');
+        speakText('Correct! ' + selected);
+        fb.innerHTML = `
+          <div class="animate-pop inline-flex items-center gap-3 bg-emerald-100 border-2 border-emerald-400 text-emerald-900 px-5 py-2.5 rounded-2xl font-display font-bold text-lg">
+            <span>✅ Correct! Great job!</span>
+            <button onclick="nextQuizQuestion()" class="toy-btn bg-emerald-600 text-white px-4 py-1 rounded-xl text-base">Next ➡️</button>
+          </div>
+        `;
+      } else {
+        btnEl.classList.replace('bg-white', 'bg-rose-400');
+        btnEl.classList.add('text-white');
+        speakText('The correct answer is ' + current.ans);
+        fb.innerHTML = `
+          <div class="animate-pop inline-flex flex-wrap items-center justify-center gap-3 bg-rose-100 border-2 border-rose-400 text-rose-900 px-5 py-2.5 rounded-2xl font-display font-bold text-lg">
+            <span>❌ Good try! Answer: ${current.ans}</span>
+            <button onclick="nextQuizQuestion()" class="toy-btn bg-sky-600 text-white px-4 py-1 rounded-xl text-base">Next ➡️</button>
+          </div>
+        `;
+      }
+    }
+
+    function nextQuizQuestion() {
+      quizIdx++;
+      renderQuiz();
+    }
+
+    function resetQuiz() {
+      quizIdx = 0;
+      quizScore = 0;
+      renderQuiz();
+    }
+
+    /*************************************************************************
+     * 6. WEB AUDIO API PROCEDURAL SOUND SYNTHESISER (NO EXTERNAL AUDIO)
+     *************************************************************************/
+    class ProceduralAudioSynth {
+      constructor() {
+        this.ctx = null;
+      }
+
+      ensureContext() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type, duration, startTimeOffset = 0, vol = 0.25, slideToFreq = null) {
+        try {
+          this.ensureContext();
+          const now = this.ctx.currentTime + startTimeOffset;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now);
+          if (slideToFreq) {
+            osc.frequency.exponentialRampToValueAtTime(slideToFreq, now + duration);
+          }
+          gain.gain.setValueAtTime(vol, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + duration);
+        } catch (e) {}
+      }
+
+      // 1. Target Lock
+      targetLock() {
+        this.playTone(520, 'sine', 0.08, 0, 0.25);
+        this.playTone(880, 'triangle', 0.14, 0.07, 0.25);
+      }
+
+      // 2. Charge Ramp
+      chargeRamp(progress) {
+        const baseFreq = 260 + progress * 640;
+        this.playTone(baseFreq, 'sawtooth', 0.1, 0, 0.12, baseFreq + 90);
+      }
+
+      // 3. Aero-Pulse Blast
+      aeroPulseBlast() {
+        this.playTone(980, 'sawtooth', 0.35, 0, 0.3, 140);
+        this.playTone(620, 'square', 0.28, 0.02, 0.2, 90);
+      }
+
+      // 4. Drone Explosion
+      droneExplosion() {
+        this.playTone(180, 'sawtooth', 0.45, 0, 0.35, 38);
+        this.playTone(320, 'triangle', 0.35, 0.04, 0.25, 55);
+      }
+
+      // 5. Deflect Buzz
+      deflectBuzz() {
+        this.playTone(150, 'sawtooth', 0.22, 0, 0.3, 110);
+        this.playTone(125, 'square', 0.25, 0.12, 0.3, 95);
+      }
+
+      // 6. Error Alert
+      errorAlert() {
+        this.playTone(330, 'square', 0.16, 0, 0.22);
+        this.playTone(240, 'square', 0.26, 0.16, 0.22);
+      }
+
+      // 7. Victory Arpeggio
+      victoryArpeggio() {
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((n, idx) => {
+          this.playTone(n, 'triangle', 0.22, idx * 0.08, 0.26);
+        });
+      }
+
+      // 8. Mission Complete Fanfare
+      missionComplete() {
+        const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
+        const times = [0, 0.11, 0.22, 0.33, 0.5, 0.65];
+        melody.forEach((freq, i) => {
+          this.playTone(freq, 'triangle', 0.32, times[i], 0.3);
+        });
+      }
+    }
+
+    const soundFX = new ProceduralAudioSynth();
+
+    /*************************************************************************
+     * 7. LIGHTNING TEACHER – THUNDER LOCK AR ENGINE
+     *************************************************************************/
+    const THUNDER_QUESTIONS = [
+      {
+        q: 'Which pet likes to bark and wag its tail?',
+        correct: 'DOG',
+        choices: ['DOG', 'CAT', 'FISH'],
+        img: 'dog'
+      },
+      {
+        q: 'The cat is ___ the box.',
+        correct: 'IN',
+        choices: ['IN', 'ON', 'UNDER'],
+        img: 'cat_in_box'
+      },
+      {
+        q: 'I have two long ears. Who am I?',
+        correct: 'Rabbit',
+        choices: ['Rabbit', 'Bird', 'Hamster'],
+        img: 'rabbit'
+      },
+      {
+        q: 'Where is the bird?',
+        correct: 'ON the tree',
+        choices: ['ON the tree', 'IN the box', 'UNDER the table'],
+        img: 'bird_on_tree'
+      },
+      {
+        q: 'Which pet lives and swims in water?',
+        correct: 'FISH',
+        choices: ['FISH', 'DOG', 'RABBIT'],
+        img: 'fish'
+      },
+      {
+        q: 'The dog is ___ the table.',
+        correct: 'UNDER',
+        choices: ['UNDER', 'ON', 'IN'],
+        img: 'dog_under_table'
+      }
+    ];
+
+    const gameState = {
+      active: false,
+      animationFrameId: null,
+      cameraInstance: null,
+      handsInstance: null,
+      videoStream: null,
+      cameraReady: false,
+      touchFallback: false,
+      qIndex: 0,
+      score: 0,
+      combo: 1,
+      highestCombo: 1,
+      missedShots: 0,
+      targets: [],
+      particles: [],
+      beams: [],
+      shieldEffect: null,
+      screenFlash: 0,
+      hand: {
+        detected: false,
+        x: 0.5,
+        y: 0.65,
+        isFist: false,
+        isOpenPalm: false
+      },
+      pointer: {
+        active: false,
+        x: 0,
+        y: 0,
+        pressing: false
+      },
+      lockedTargetId: null,
+      chargeStartTime: null,
+      chargeProgress: 0,
+      lastChargeStep: -1,
+      reticleAngle: 0,
+      ambientFloats: []
+    };
+
+    const CHARGE_DURATION_MS = 950; // 0.95 seconds after clench fist gesture
+
+    function launchThunderLockGame() {
+      soundFX.ensureContext();
+      const wrapper = document.getElementById('game-fullscreen-wrapper');
+      wrapper.classList.add('active');
+
+      // Reset Game State
+      gameState.active = true;
+      gameState.qIndex = 0;
+      gameState.score = 0;
+      gameState.combo = 1;
+      gameState.highestCombo = 1;
+      gameState.missedShots = 0;
+      gameState.particles = [];
+      gameState.beams = [];
+      gameState.shieldEffect = null;
+      gameState.lockedTargetId = null;
+      gameState.chargeStartTime = null;
+      gameState.chargeProgress = 0;
+      gameState.hand.detected = false;
+      gameState.pointer.active = false;
+      gameState.pointer.pressing = false;
+
+      document.getElementById('game-victory-modal').classList.add('hidden');
+      document.getElementById('game-camera-error-modal').classList.add('hidden');
+      document.getElementById('victory-review-box').classList.add('hidden');
+
+      initAmbientFloats();
+      // Wait one animation frame so fullscreen layout dimensions are non-zero
+      requestAnimationFrame(() => {
+        resizeARCanvas();
+        setupRoundTargets();
+        updateGameHUD();
+        setFloatingCatMsg('Open your palm to select an answer.');
+        startLoadingSequence();
+      });
+    }
+
+    function startLoadingSequence() {
+      const modal = document.getElementById('game-loading-modal');
+      const bar = document.getElementById('loading-progress-bar');
+      const pctText = document.getElementById('loading-percent-text');
+      const subText = document.getElementById('loading-status-sub');
+      modal.classList.remove('hidden');
+      bar.style.width = '15%';
+      pctText.textContent = '15%';
+      subText.textContent = 'Activating hand detection system...';
+
+      let settled = false;
+      let pct = 15;
+      const interval = setInterval(() => {
+        if (!gameState.active || settled) {
+          clearInterval(interval);
+          return;
+        }
+        pct = Math.min(pct + 15, 92);
+        bar.style.width = pct + '%';
+        pctText.textContent = pct + '%';
+      }, 220);
+
+      // Timeout safeguard so sandboxed iframes never hang on loading screen
+      const timeoutGuard = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Camera initialization timeout')), 4500);
+      });
+
+      Promise.race([initWebcamAndMediaPipe(), timeoutGuard]).then(() => {
+        if (settled || !gameState.active) return;
+        settled = true;
+        clearInterval(interval);
+        bar.style.width = '100%';
+        pctText.textContent = '100%';
+        const camBtn = document.getElementById('hud-camera-btn');
+        if (camBtn) camBtn.classList.add('hidden');
+        setTimeout(() => {
+          modal.classList.add('hidden');
+          resizeARCanvas();
+          if (!gameState.animationFrameId && gameState.active) {
+            gameLoop();
+          }
+        }, 300);
+      }).catch(() => {
+        if (settled || !gameState.active) return;
+        settled = true;
+        clearInterval(interval);
+        modal.classList.add('hidden');
+        // Automatically launch Mouse / Touch mode smoothly if embedded iframe blocks webcam
+        startTouchFallbackMode(true);
+      });
+    }
+
+    async function initWebcamAndMediaPipe() {
+      const videoEl = document.getElementById('webcam-video');
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('No camera API');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+
+      if (!gameState.active) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+
+      gameState.videoStream = stream;
+      videoEl.srcObject = stream;
+      await videoEl.play();
+      gameState.cameraReady = true;
+      gameState.touchFallback = false;
+      document.getElementById('hud-mode-badge').textContent = '✋ WEBCAM HAND TRACKING';
+
+      // Initialize MediaPipe Hands if loaded from CDN
+      if (typeof Hands !== 'undefined') {
+        try {
+          if (!gameState.handsInstance) {
+            gameState.handsInstance = new Hands({
+              locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            gameState.handsInstance.setOptions({
+              maxNumHands: 1,
+              modelComplexity: 1,
+              minDetectionConfidence: 0.6,
+              minTrackingConfidence: 0.55
+            });
+
+            gameState.handsInstance.onResults(onMediaPipeResults);
+          }
+
+          // Drive MediaPipe frames safely inside our own loop instead of blocking on Camera.start()
+          let isSendingFrame = false;
+          const processHandFrame = async () => {
+            if (!gameState.active || !gameState.cameraReady) return;
+            if (!isSendingFrame && gameState.handsInstance && videoEl.readyState >= 2) {
+              isSendingFrame = true;
+              try {
+                await gameState.handsInstance.send({ image: videoEl });
+              } catch (err) {
+                // Keep game running smoothly even if WASM fails in restricted iframe
+                gameState.touchFallback = true;
+                document.getElementById('hud-mode-badge').textContent = '👆 TOUCH & MOUSE MODE';
+              } finally {
+                isSendingFrame = false;
+              }
+            }
+            if (gameState.active && gameState.cameraReady) {
+              setTimeout(processHandFrame, 45);
+            }
+          };
+          processHandFrame();
+        } catch (mpErr) {
+          gameState.touchFallback = true;
+          document.getElementById('hud-mode-badge').textContent = '👆 TOUCH & MOUSE MODE';
+        }
+      } else {
+        // Fallback to touch if MediaPipe script blocked offline
+        gameState.touchFallback = true;
+        document.getElementById('hud-mode-badge').textContent = '👆 TOUCH & MOUSE MODE';
+      }
+    }
+
+    function retryCameraAccess() {
+      document.getElementById('game-camera-error-modal').classList.add('hidden');
+      startLoadingSequence();
+    }
+
+    function startTouchFallbackMode(autoSwitched = false) {
+      document.getElementById('game-camera-error-modal').classList.add('hidden');
+      gameState.cameraReady = false;
+      gameState.touchFallback = true;
+      const camBtn = document.getElementById('hud-camera-btn');
+      if (camBtn) camBtn.classList.remove('hidden');
+      document.getElementById('hud-mode-badge').textContent = '👆 MOUSE & TOUCH MODE';
+      setFloatingCatMsg(
+        autoSwitched
+          ? 'Click & hold (or touch & hold) an answer ball to lock and fire!'
+          : 'Touch & hold an answer ball to lock and fire!'
+      );
+      resizeARCanvas();
+      if (!gameState.animationFrameId && gameState.active) {
+        gameLoop();
+      }
+    }
+
+    function exitThunderLockGame() {
+      gameState.active = false;
+      if (gameState.animationFrameId) {
+        cancelAnimationFrame(gameState.animationFrameId);
+        gameState.animationFrameId = null;
+      }
+      if (gameState.cameraInstance) {
+        try { gameState.cameraInstance.stop(); } catch (e) {}
+        gameState.cameraInstance = null;
+      }
+      if (gameState.videoStream) {
+        gameState.videoStream.getTracks().forEach(track => track.stop());
+        gameState.videoStream = null;
+      }
+      gameState.cameraReady = false;
+      document.getElementById('game-fullscreen-wrapper').classList.remove('active');
+    }
+
+    function restartThunderLockGame() {
+      document.getElementById('game-victory-modal').classList.add('hidden');
+      document.getElementById('victory-review-box').classList.add('hidden');
+      gameState.qIndex = 0;
+      gameState.score = 0;
+      gameState.combo = 1;
+      gameState.highestCombo = 1;
+      gameState.missedShots = 0;
+      gameState.particles = [];
+      gameState.beams = [];
+      gameState.shieldEffect = null;
+      gameState.lockedTargetId = null;
+      gameState.chargeStartTime = null;
+      gameState.chargeProgress = 0;
+      resizeARCanvas();
+      setupRoundTargets();
+      updateGameHUD();
+      setFloatingCatMsg('Open your palm to select an answer.');
+      if (!gameState.animationFrameId && gameState.active) {
+        gameLoop();
+      }
+    }
+
+    function exitThunderLockGame() {
+      gameState.active = false;
+      if (gameState.animationFrameId) {
+        cancelAnimationFrame(gameState.animationFrameId);
+        gameState.animationFrameId = null;
+      }
+      if (gameState.cameraInstance) {
+        try { gameState.cameraInstance.stop(); } catch (e) {}
+        gameState.cameraInstance = null;
+      }
+      if (gameState.videoStream) {
+        gameState.videoStream.getTracks().forEach(track => track.stop());
+        gameState.videoStream = null;
+      }
+      gameState.cameraReady = false;
+      document.getElementById('game-fullscreen-wrapper').classList.remove('active');
+    }
+
+    function restartThunderLockGame() {
+      document.getElementById('game-victory-modal').classList.add('hidden');
+      document.getElementById('victory-review-box').classList.add('hidden');
+      gameState.qIndex = 0;
+      gameState.score = 0;
+      gameState.combo = 1;
+      gameState.highestCombo = 1;
+      gameState.missedShots = 0;
+      gameState.particles = [];
+      gameState.beams = [];
+      gameState.shieldEffect = null;
+      gameState.lockedTargetId = null;
+      gameState.chargeStartTime = null;
+      gameState.chargeProgress = 0;
+      setupRoundTargets();
+      updateGameHUD();
+      setFloatingCatMsg('Open your palm to select an answer.');
+    }
+
+    // Analyze all 21 MediaPipe Hand Landmarks
+    function onMediaPipeResults(results) {
+      if (!gameState.active) return;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        // Palm center approximation using wrist (0) & middle MCP (9)
+        const palmX = 1 - ((landmarks[0].x + landmarks[9].x) * 0.5); // Mirrored X
+        const palmY = (landmarks[0].y + landmarks[9].y) * 0.5;
+
+        // Finger curl detection across Index (8/6), Middle (12/10), Ring (16/14), Pinky (20/18)
+        const wrist = landmarks[0];
+        const fingerPairs = [
+          [8, 6],
+          [12, 10],
+          [16, 14],
+          [20, 18]
+        ];
+
+        let curledCount = 0;
+        fingerPairs.forEach(([tipIdx, pipIdx]) => {
+          const tipDist = Math.hypot(landmarks[tipIdx].x - wrist.x, landmarks[tipIdx].y - wrist.y);
+          const pipDist = Math.hypot(landmarks[pipIdx].x - wrist.x, landmarks[pipIdx].y - wrist.y);
+          if (tipDist < pipDist * 1.08) {
+            curledCount++;
+          }
+        });
+
+        gameState.hand.detected = true;
+        gameState.hand.x = palmX;
+        gameState.hand.y = palmY;
+        gameState.hand.isFist = curledCount >= 3;
+        gameState.hand.isOpenPalm = curledCount <= 1;
+      } else {
+        gameState.hand.detected = false;
+        gameState.hand.isFist = false;
+        gameState.hand.isOpenPalm = false;
+      }
+    }
+
+    // Canvas Responsive Sizing with devicePixelRatio
+    function resizeARCanvas() {
+      const canvas = document.getElementById('ar-canvas');
+      if (!canvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width || window.innerWidth;
+      const height = rect.height || window.innerHeight;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      layoutTargetsOnScreen();
+    }
+
+    window.addEventListener('resize', () => {
+      if (gameState.active) resizeARCanvas();
+    });
+
+    function initAmbientFloats() {
+      const emojis = ['🐾', '⭐', '☁️', '🎈', '✨', '🦴'];
+      gameState.ambientFloats = Array.from({ length: 14 }, (_, i) => ({
+        x: Math.random(),
+        y: Math.random(),
+        speedY: 0.0004 + Math.random() * 0.0006,
+        size: 18 + Math.random() * 14,
+        emoji: emojis[i % emojis.length],
+        phase: Math.random() * Math.PI * 2
+      }));
+    }
+
+    function setupRoundTargets() {
+      const currentQ = THUNDER_QUESTIONS[gameState.qIndex];
+      document.getElementById('game-q-text').textContent = currentQ.q;
+      document.getElementById('game-q-illustration').innerHTML = PET_SVGS[currentQ.img];
+
+      // Shuffle 3 choices
+      const shuffled = [...currentQ.choices].sort(() => Math.random() - 0.5);
+      const colors = [
+        { fill: '#38BDF8', stroke: '#0284C7', glow: '#7DD3FC' },
+        { fill: '#FBBF24', stroke: '#D97706', glow: '#FDE68A' },
+        { fill: '#4ADE80', stroke: '#16A34A', glow: '#86EFAC' }
+      ];
+
+      gameState.targets = shuffled.map((label, idx) => ({
+        id: idx,
+        label,
+        isCorrect: label === currentQ.correct,
+        normX: 0.22 + idx * 0.28,
+        normY: 0.56,
+        x: 0,
+        y: 0,
+        radius: 62,
+        bobPhase: idx * 1.4,
+        color: colors[idx % colors.length],
+        hitAnim: 0
+      }));
+
+      layoutTargetsOnScreen();
+      speakCurrentGameQuestion();
+    }
+
+    function layoutTargetsOnScreen() {
+      const canvas = document.getElementById('ar-canvas');
+      if (!canvas) return;
+      const w = canvas.clientWidth || window.innerWidth;
+      const h = canvas.clientHeight || window.innerHeight;
+      const isPortrait = h > w;
+
+      gameState.targets.forEach((t, idx) => {
+        if (isPortrait) {
+          // Generous vertical & horizontal spacing on portrait mobile
+          const positions = [
+            { x: w * 0.28, y: h * 0.48 },
+            { x: w * 0.72, y: h * 0.54 },
+            { x: w * 0.50, y: h * 0.68 }
+          ];
+          t.x = positions[idx].x;
+          t.y = positions[idx].y;
+          t.radius = Math.max(48, Math.min(w * 0.14, 64));
+        } else {
+          t.x = w * (0.22 + idx * 0.28);
+          t.y = h * 0.57;
+          t.radius = Math.max(54, Math.min(w * 0.075, 74));
+        }
+      });
+    }
+
+    function speakCurrentGameQuestion() {
+      const currentQ = THUNDER_QUESTIONS[gameState.qIndex];
+      if (currentQ) {
+        speakText(currentQ.q.replace('___', 'blank'));
+      }
+    }
+
+    function updateGameHUD() {
+      document.getElementById('hud-score').textContent = gameState.score;
+      document.getElementById('hud-combo').textContent = `×${gameState.combo}`;
+      const total = THUNDER_QUESTIONS.length;
+      const currentNum = Math.min(gameState.qIndex + 1, total);
+      document.getElementById('hud-mission-label').textContent = `MISSION 0${currentNum} / 0${total}`;
+
+      let nodesStr = '';
+      for (let i = 0; i < total; i++) {
+        nodesStr += (i < gameState.qIndex ? '● ' : '○ ');
+      }
+      document.getElementById('hud-mission-nodes').textContent = nodesStr.trim();
+    }
+
+    function setFloatingCatMsg(msg) {
+      document.getElementById('floating-cat-message').textContent = msg;
+    }
+
+    function showCenterToast(text, bgClass = 'bg-sky-600') {
+      const toast = document.getElementById('game-status-toast');
+      const span = document.getElementById('game-status-text');
+      span.textContent = text;
+      span.className = `inline-block font-display font-bold text-xl sm:text-3xl px-6 py-2 rounded-full ${bgClass} text-white border-4 border-white shadow-xl`;
+      toast.style.opacity = '1';
+      clearTimeout(toast._hideTimer);
+      toast._hideTimer = setTimeout(() => {
+        toast.style.opacity = '0';
+      }, 1100);
+    }
+
+    // Touch & Mouse Fallback Listeners on Canvas
+    const arCanvasEl = document.getElementById('ar-canvas');
+    function updatePointerCoords(e) {
+      const rect = arCanvasEl.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      gameState.pointer.x = clientX - rect.left;
+      gameState.pointer.y = clientY - rect.top;
+      gameState.pointer.active = true;
+    }
+
+    arCanvasEl.addEventListener('pointerdown', (e) => {
+      if (!gameState.active) return;
+      soundFX.ensureContext();
+      updatePointerCoords(e);
+      gameState.pointer.pressing = true;
+    });
+
+    arCanvasEl.addEventListener('pointermove', (e) => {
+      if (!gameState.active) return;
+      updatePointerCoords(e);
+    });
+
+    arCanvasEl.addEventListener('pointerup', () => {
+      gameState.pointer.pressing = false;
+    });
+
+    arCanvasEl.addEventListener('pointercancel', () => {
+      gameState.pointer.pressing = false;
+    });
+
+    // Main Game Loop
+    function gameLoop(timestamp = 0) {
+      if (!gameState.active) return;
+      updateGameLogic(timestamp);
+      renderGameCanvas(timestamp);
+      gameState.animationFrameId = requestAnimationFrame(gameLoop);
+    }
+
+    function updateGameLogic(timestamp) {
+      const canvas = document.getElementById('ar-canvas');
+      const w = canvas.clientWidth || window.innerWidth;
+      const h = canvas.clientHeight || window.innerHeight;
+
+      // Determine active cursor (Webcam Hand vs Pointer Fallback)
+      let cursorX = null;
+      let cursorY = null;
+      let isLockingGesture = false;
+
+      if (gameState.hand.detected) {
+        cursorX = gameState.hand.x * w;
+        cursorY = gameState.hand.y * h;
+        isLockingGesture = gameState.hand.isFist;
+      } else if (gameState.pointer.active) {
+        cursorX = gameState.pointer.x;
+        cursorY = gameState.pointer.y;
+        isLockingGesture = gameState.pointer.pressing;
+      }
+
+      // Find hovered target ball
+      let hoveredTarget = null;
+      if (cursorX !== null && cursorY !== null) {
+        for (const t of gameState.targets) {
+          const bobY = t.y + Math.sin(timestamp * 0.003 + t.bobPhase) * 8;
+          const dist = Math.hypot(cursorX - t.x, cursorY - bobY);
+          if (dist <= t.radius * 1.35) {
+            hoveredTarget = t;
+            break;
+          }
+        }
+      }
+
+      // Handle Target Lock & 0.95s Energy Charge
+      if (hoveredTarget && isLockingGesture) {
+        if (gameState.lockedTargetId !== hoveredTarget.id) {
+          gameState.lockedTargetId = hoveredTarget.id;
+          gameState.chargeStartTime = timestamp;
+          gameState.chargeProgress = 0;
+          gameState.lastChargeStep = -1;
+          soundFX.targetLock();
+          showCenterToast('TARGET LOCK', 'bg-amber-500');
+          setFloatingCatMsg('Clench fist: Target detected.');
+        } else {
+          const elapsed = timestamp - gameState.chargeStartTime;
+          gameState.chargeProgress = Math.min(elapsed / CHARGE_DURATION_MS, 1);
+          const step = Math.floor(gameState.chargeProgress * 4);
+          if (step > gameState.lastChargeStep && step < 4) {
+            gameState.lastChargeStep = step;
+            soundFX.chargeRamp(gameState.chargeProgress);
+          }
+
+          if (gameState.chargeProgress >= 1) {
+            // FIRE!
+            fireThunderBeam(cursorX, cursorY, hoveredTarget, timestamp);
+            gameState.lockedTargetId = null;
+            gameState.chargeStartTime = null;
+            gameState.chargeProgress = 0;
+            gameState.pointer.pressing = false;
+          }
+        }
+      } else {
+        if (gameState.lockedTargetId !== null) {
+          gameState.lockedTargetId = null;
+          gameState.chargeStartTime = null;
+          gameState.chargeProgress = 0;
+        }
+        if (gameState.hand.detected && gameState.hand.isOpenPalm) {
+          setFloatingCatMsg('Ready for control.');
+        }
+      }
+
+      gameState.reticleAngle += 0.05;
+
+      // Update Particles
+      for (let i = gameState.particles.length - 1; i >= 0; i--) {
+        const p = gameState.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.15;
+        p.life -= 0.025;
+        if (p.life <= 0) gameState.particles.splice(i, 1);
+      }
+
+      // Update Beams
+      for (let i = gameState.beams.length - 1; i >= 0; i--) {
+        gameState.beams[i].life -= 0.06;
+        if (gameState.beams[i].life <= 0) gameState.beams.splice(i, 1);
+      }
+
+      if (gameState.screenFlash > 0) {
+        gameState.screenFlash = Math.max(0, gameState.screenFlash - 0.06);
+      }
+
+      if (gameState.shieldEffect && gameState.shieldEffect.life > 0) {
+        gameState.shieldEffect.life -= 0.04;
+      } else {
+        gameState.shieldEffect = null;
+      }
+    }
+
+    function fireThunderBeam(originX, originY, target, timestamp) {
+      const targetY = target.y + Math.sin(timestamp * 0.003 + target.bobPhase) * 8;
+      soundFX.aeroPulseBlast();
+      showCenterToast('FIRE!', 'bg-cyan-500');
+
+      gameState.beams.push({
+        x1: originX,
+        y1: originY,
+        x2: target.x,
+        y2: targetY,
+        life: 1.0
+      });
+
+      if (target.isCorrect) {
+        // CORRECT ANSWER!
+        soundFX.droneExplosion();
+        soundFX.victoryArpeggio();
+        gameState.screenFlash = 0.65;
+
+        const pointsEarned = 100 * gameState.combo;
+        gameState.score += pointsEarned;
+        if (gameState.combo > gameState.highestCombo) {
+          gameState.highestCombo = gameState.combo;
+        }
+        gameState.combo = Math.min(gameState.combo + 1, 5);
+
+        spawnCelebrationParticles(target.x, targetY);
+        showCenterToast(`☑ CORRECT! +${pointsEarned}`, 'bg-emerald-500');
+        setFloatingCatMsg('Excellent! You answered correctly.');
+        speakText('Correct! Well done!');
+
+        gameState.qIndex++;
+        updateGameHUD();
+
+        if (gameState.qIndex >= THUNDER_QUESTIONS.length) {
+          setTimeout(() => showVictoryModal(), 900);
+        } else {
+          setTimeout(() => {
+            if (gameState.active) setupRoundTargets();
+          }, 950);
+        }
+      } else {
+        // INCORRECT ANSWER!
+        soundFX.deflectBuzz();
+        gameState.missedShots++;
+        gameState.combo = 1;
+        updateGameHUD();
+
+        gameState.shieldEffect = {
+          x: target.x,
+          y: targetY,
+          radius: target.radius * 1.35,
+          life: 1.0
+        };
+
+        const wrapper = document.getElementById('game-fullscreen-wrapper');
+        wrapper.classList.remove('shake-effect');
+        void wrapper.offsetWidth;
+        wrapper.classList.add('shake-effect');
+
+        showCenterToast('❌ WRONG TARGET', 'bg-rose-600');
+        setFloatingCatMsg('Try again. Pay attention to the question and identify the correct answer.');
+        speakText('Wrong target! Try again!');
+      }
+    }
+
+    function spawnCelebrationParticles(x, y) {
+      const palette = ['#FACC15', '#38BDF8', '#4ADE80', '#FB923C', '#F472B6', '#A78BFA'];
+      for (let i = 0; i < 36; i++) {
+        const angle = (Math.PI * 2 * i) / 36 + Math.random() * 0.3;
+        const speed = 3 + Math.random() * 7;
+        gameState.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: 6 + Math.random() * 7,
+          color: palette[i % palette.length],
+          life: 1.0
+        });
+      }
+    }
+
+    function showVictoryModal() {
+      soundFX.missionComplete();
+      const modal = document.getElementById('game-victory-modal');
+      modal.classList.remove('hidden');
+
+      document.getElementById('stat-final-score').textContent = gameState.score;
+      document.getElementById('stat-highest-combo').textContent = `×${gameState.highestCombo}`;
+      document.getElementById('stat-missed-shots').textContent = gameState.missedShots;
+      document.getElementById('stat-mastered').textContent = `${THUNDER_QUESTIONS.length} / ${THUNDER_QUESTIONS.length}`;
+
+      // Award 1 to 3 Holographic Animated Stars
+      const starCount = gameState.missedShots === 0 ? 3 : (gameState.missedShots <= 2 ? 2 : 1);
+      const starsContainer = document.getElementById('victory-stars-container');
+      starsContainer.innerHTML = '';
+
+      for (let i = 0; i < starCount; i++) {
+        setTimeout(() => {
+          const starSpan = document.createElement('span');
+          starSpan.textContent = '⭐';
+          starSpan.className = 'text-5xl sm:text-6xl star-animated inline-block';
+          starsContainer.appendChild(starSpan);
+          soundFX.playTone(660 + i * 220, 'triangle', 0.25, 0, 0.25);
+        }, i * 320);
+      }
+
+      // Populate Review List
+      const reviewList = document.getElementById('victory-review-list');
+      reviewList.innerHTML = THUNDER_QUESTIONS.map((item, idx) => `
+        <li class="bg-white p-2.5 rounded-xl border border-slate-200">
+          <span class="text-purple-600">${idx + 1}. ${item.q}</span> →
+          <span class="text-emerald-600 font-extrabold">${item.correct}</span>
+        </li>
+      `).join('');
+    }
+
+    function toggleVictoryReview() {
+      const box = document.getElementById('victory-review-box');
+      box.classList.toggle('hidden');
+    }
+
+    // Render Canvas Layers: Mirrored Webcam -> Ambient Playground -> Answer Balls -> Cyber Gauntlet & Reticle -> Beams & Particles
+    function renderGameCanvas(timestamp) {
+      const canvas = document.getElementById('ar-canvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.clientWidth || window.innerWidth;
+      const h = canvas.clientHeight || window.innerHeight;
+      const videoEl = document.getElementById('webcam-video');
+
+      ctx.clearRect(0, 0, w, h);
+
+      // 1. Live Webcam Mirror Feed (or Pastel Playground Fallback)
+      if (gameState.cameraReady && videoEl.readyState >= 2) {
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+
+        const vw = videoEl.videoWidth || 1280;
+        const vh = videoEl.videoHeight || 720;
+        const scale = Math.max(w / vw, h / vh);
+        const drawW = vw * scale;
+        const drawH = vh * scale;
+        const offsetX = (w - drawW) * 0.5;
+        const offsetY = (h - drawH) * 0.5;
+
+        ctx.drawImage(videoEl, offsetX, offsetY, drawW, drawH);
+        ctx.restore();
+
+        // Soft pastel AR tint overlay so cartoon UI remains super crisp
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.22)';
+        ctx.fillRect(0, 0, w, h);
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, '#BAE6FD');
+        grad.addColorStop(0.5, '#FEF9C3');
+        grad.addColorStop(1, '#BBF7D0');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // 2. Ambient Floating Bubbles, Stars & Paw Prints
+      ctx.save();
+      gameState.ambientFloats.forEach(item => {
+        item.y -= item.speedY;
+        if (item.y < -0.05) item.y = 1.05;
+        const fx = (item.x + Math.sin(timestamp * 0.001 + item.phase) * 0.02) * w;
+        const fy = item.y * h;
+        ctx.font = `${item.size}px Fredoka, sans-serif`;
+        ctx.globalAlpha = 0.55;
+        ctx.fillText(item.emoji, fx, fy);
+      });
+      ctx.restore();
+
+      // 3. Answer Ball Targets (Cartoon Toy Bubbles)
+      gameState.targets.forEach(t => {
+        const bobY = t.y + Math.sin(timestamp * 0.003 + t.bobPhase) * 8;
+        const isLocked = gameState.lockedTargetId === t.id;
+
+        ctx.save();
+        // Outer glow if locked
+        if (isLocked) {
+          ctx.beginPath();
+          ctx.arc(t.x, bobY, t.radius + 14 + Math.sin(timestamp * 0.02) * 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(6, 182, 212, 0.35)';
+          ctx.fill();
+        }
+
+        // Main Answer Ball Body
+        ctx.beginPath();
+        ctx.arc(t.x, bobY, t.radius, 0, Math.PI * 2);
+        ctx.fillStyle = t.color.fill;
+        ctx.fill();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+
+        // Top Gloss Highlight
+        ctx.beginPath();
+        ctx.ellipse(t.x - t.radius * 0.28, bobY - t.radius * 0.32, t.radius * 0.25, t.radius * 0.13, -0.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.fill();
+
+        // Answer Word Label
+        ctx.fillStyle = '#0F172A';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const fontSize = t.label.length > 8 ? Math.max(15, t.radius * 0.27) : Math.max(20, t.radius * 0.36);
+        ctx.font = `700 ${fontSize}px Fredoka, sans-serif`;
+        ctx.fillText(t.label, t.x, bobY + 2);
+        ctx.restore();
+      });
+
+      // 4. Red Cyber Shield on Wrong Target
+      if (gameState.shieldEffect) {
+        const s = gameState.shieldEffect;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(239, 68, 68, ${s.life * 0.35})`;
+        ctx.fill();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = `rgba(220, 38, 38, ${s.life})`;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 5. Cyber Gauntlet & Arc Core on Player's Hand / Pointer
+      let handX = null;
+      let handY = null;
+      if (gameState.hand.detected) {
+        handX = gameState.hand.x * w;
+        handY = gameState.hand.y * h;
+      } else if (gameState.pointer.active) {
+        handX = gameState.pointer.x;
+        handY = gameState.pointer.y;
+      }
+
+      if (handX !== null && handY !== null) {
+        ctx.save();
+        ctx.translate(handX, handY);
+
+        // Cyber Gauntlet Outer Ring
+        ctx.beginPath();
+        ctx.arc(0, 0, 36, 0, Math.PI * 2);
+        ctx.strokeStyle = '#06B6D4';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Arc Core in Center of Palm
+        const coreGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
+        coreGrad.addColorStop(0, '#FFFFFF');
+        coreGrad.addColorStop(0.5, '#22D3EE');
+        coreGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rotating Target Lock Reticle & Energy Meter
+        if (gameState.lockedTargetId !== null) {
+          ctx.save();
+          ctx.rotate(gameState.reticleAngle);
+          ctx.strokeStyle = '#F59E0B';
+          ctx.lineWidth = 4;
+          ctx.setLineDash([12, 8]);
+          ctx.beginPath();
+          ctx.arc(0, 0, 52, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+
+          // Progressive Energy Charge Arc (0% -> 100%)
+          ctx.beginPath();
+          ctx.arc(0, 0, 62, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gameState.chargeProgress);
+          ctx.strokeStyle = '#10B981';
+          ctx.lineWidth = 7;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+
+          // Percentage Text
+          const pct = Math.round(gameState.chargeProgress * 100);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '700 16px Fredoka, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`${pct}%`, 0, -72);
+        }
+
+        ctx.restore();
+      }
+
+      // 6. Cyber Cyan Energy Beam
+      gameState.beams.forEach(b => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(b.x1, b.y1);
+        ctx.lineTo(b.x2, b.y2);
+        ctx.strokeStyle = `rgba(6, 182, 212, ${b.life})`;
+        ctx.lineWidth = 18 * b.life;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(b.x1, b.y1);
+        ctx.lineTo(b.x2, b.y2);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${b.life})`;
+        ctx.lineWidth = 7 * b.life;
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 7. Celebration Particles
+      gameState.particles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 8. Slight Celebration Flash
+      if (gameState.screenFlash > 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${gameState.screenFlash * 0.45})`;
+        ctx.fillRect(0, 0, w, h);
+      }
+    }
+
+    // Initialize Dynamic Sections on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderPetsGrid();
+      renderExploreStage();
+      renderQuiz();
+
+      // Auto-launch AR Webcam Game if opened with ?play=ar
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('play') === 'ar') {
+        navigateTo('play');
+        launchThunderLockGame();
+      }
+    });
+  </script>
+</body>
+</html>
